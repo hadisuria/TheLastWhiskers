@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Simple Isometric Japanese Room</title>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"></script>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				background-color: #333;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+			}
+			canvas {
+				display: block;
+			}
+		</style>
+	</head>
+	<body>
+		<script>
+			class IsometricScene extends Phaser.Scene {
+				constructor() {
+					super("IsometricScene");
+					// Tile size (width of a tile's footprint)
+					this.tileWidth = 64;
+					this.tileHeight = 32;
+				}
+
+				preload() {
+					console.log("Loading assets...");
+
+					// Floor and wall tiles
+					this.load.image("tatami", "assets/tatami.png");
+					this.load.image("wall", "assets/wall.png");
+
+					// Items
+					this.load.image("table", "assets/table.png");
+					this.load.image("bookshelf", "assets/bookshelf.png");
+					this.load.image("plant", "assets/plant.png");
+
+					// Player character
+					this.load.image("player", "assets/player.png");
+
+					// Debugging
+					this.load.on("complete", () =>
+						console.log("All assets loaded successfully!")
+					);
+					this.load.on("loaderror", (file) =>
+						console.error("Error loading asset:", file.src)
+					);
+				}
+
+				create() {
+					console.log("Creating isometric scene...");
+
+					// Room dimensions (in tiles)
+					this.roomWidth = 5;
+					this.roomHeight = 5;
+
+					// Create tile groups
+					this.floorTiles = this.add.group();
+					this.items = this.physics.add.group();
+
+					// Create the floor
+					this.createFloor();
+
+					// Create items
+					this.createItems();
+
+					// Create player
+					this.createPlayer();
+
+					// Set up camera
+					this.cameras.main.setBackgroundColor("#5e3f6b");
+
+					// Controls
+					this.cursors = this.input.keyboard.createCursorKeys();
+					this.interactKey = this.input.keyboard.addKey("E");
+
+					// UI for interaction
+					this.interactText = this.add
+						.text(400, 500, "", {
+							fontSize: "16px",
+							fill: "#fff",
+							backgroundColor: "#000",
+							padding: { x: 10, y: 5 },
+						})
+						.setOrigin(0.5)
+						.setScrollFactor(0)
+						.setDepth(100);
+					this.interactText.setVisible(false);
+
+					// Instructions
+					this.add
+						.text(400, 50, "Arrow keys to move. E to interact with items.", {
+							fontSize: "16px",
+							fill: "#fff",
+							backgroundColor: "#000",
+							padding: { x: 10, y: 5 },
+						})
+						.setOrigin(0.5)
+						.setScrollFactor(0)
+						.setDepth(100);
+
+					console.log("Scene created!");
+				}
+
+				createFloor() {
+					// Calculate center offset for the room
+					const offsetX =
+						400 - ((this.roomWidth - this.roomHeight) * this.tileWidth) / 4;
+					const offsetY = 200;
+
+					// Create floor tiles
+					for (let y = 0; y < this.roomHeight; y++) {
+						for (let x = 0; x < this.roomWidth; x++) {
+							// Convert grid coordinates to isometric screen coordinates
+							const screenX = ((x - y) * this.tileWidth) / 2 + offsetX;
+							const screenY = ((x + y) * this.tileHeight) / 2 + offsetY;
+
+							// Create floor tile
+							const tile = this.add.image(screenX, screenY, "tatami");
+
+							// Store grid position in the tile object
+							tile.gridX = x;
+							tile.gridY = y;
+
+							// Set depth based on position (further back items drawn first)
+							tile.setDepth(x + y);
+
+							this.floorTiles.add(tile);
+						}
+					}
+				}
+
+				createItems() {
+					// Center of the room
+					const offsetX =
+						400 - ((this.roomWidth - this.roomHeight) * this.tileWidth) / 4;
+					const offsetY = 200;
+
+					// Add a table in the center
+					const tableX = 2;
+					const tableY = 2;
+					const tableScreenX =
+						((tableX - tableY) * this.tileWidth) / 2 + offsetX;
+					const tableScreenY =
+						((tableX + tableY) * this.tileHeight) / 2 + offsetY - 16; // Raised slightly
+
+					const table = this.physics.add.image(
+						tableScreenX,
+						tableScreenY,
+						"table"
+					);
+					table.gridX = tableX;
+					table.gridY = tableY;
+					table.setDepth(tableX + tableY + 1); // Above floor
+					table.name = "table";
+					table.description = "A traditional Japanese tea table with cushions.";
+					this.items.add(table);
+
+					// Add a bookshelf
+					const bookshelfX = 0;
+					const bookshelfY = 1;
+					const bookshelfScreenX =
+						((bookshelfX - bookshelfY) * this.tileWidth) / 2 + offsetX;
+					const bookshelfScreenY =
+						((bookshelfX + bookshelfY) * this.tileHeight) / 2 + offsetY - 32; // Taller
+
+					const bookshelf = this.physics.add.image(
+						bookshelfScreenX,
+						bookshelfScreenY,
+						"bookshelf"
+					);
+					bookshelf.gridX = bookshelfX;
+					bookshelf.gridY = bookshelfY;
+					bookshelf.setDepth(bookshelfX + bookshelfY + 1);
+					bookshelf.name = "bookshelf";
+					bookshelf.description =
+						"A wooden bookshelf filled with scrolls and books.";
+					this.items.add(bookshelf);
+
+					// Add a plant
+					const plantX = 4;
+					const plantY = 1;
+					const plantScreenX =
+						((plantX - plantY) * this.tileWidth) / 2 + offsetX;
+					const plantScreenY =
+						((plantX + plantY) * this.tileHeight) / 2 + offsetY - 24;
+
+					const plant = this.physics.add.image(
+						plantScreenX,
+						plantScreenY,
+						"plant"
+					);
+					plant.gridX = plantX;
+					plant.gridY = plantY;
+					plant.setDepth(plantX + plantY + 1);
+					plant.name = "plant";
+					plant.description = "A carefully maintained bonsai plant.";
+					this.items.add(plant);
+				}
+
+				createPlayer() {
+					// Start position (in grid coordinates)
+					const playerGridX = 2;
+					const playerGridY = 4;
+
+					// Calculate center offset for the room
+					const offsetX =
+						400 - ((this.roomWidth - this.roomHeight) * this.tileWidth) / 4;
+					const offsetY = 200;
+
+					// Convert to screen coordinates
+					const screenX =
+						((playerGridX - playerGridY) * this.tileWidth) / 2 + offsetX;
+					const screenY =
+						((playerGridX + playerGridY) * this.tileHeight) / 2 + offsetY - 16; // Raised a bit
+
+					// Create player
+					this.player = this.physics.add.sprite(screenX, screenY, "player");
+
+					// Store grid position
+					this.player.gridX = playerGridX;
+					this.player.gridY = playerGridY;
+
+					// Set depth based on position
+					this.updatePlayerDepth();
+
+					console.log("Player created at grid:", playerGridX, playerGridY);
+				}
+
+				updatePlayerDepth() {
+					// Set depth so player is drawn above tiles at same position
+					this.player.setDepth(this.player.gridX + this.player.gridY + 10);
+				}
+
+				movePlayer(dx, dy) {
+					// Calculate new grid position
+					const newGridX = this.player.gridX + dx;
+					const newGridY = this.player.gridY + dy;
+
+					// Check if the new position is valid
+					if (this.isValidPosition(newGridX, newGridY)) {
+						// Update grid position
+						this.player.gridX = newGridX;
+						this.player.gridY = newGridY;
+
+						// Calculate center offset for the room
+						const offsetX =
+							400 - ((this.roomWidth - this.roomHeight) * this.tileWidth) / 4;
+						const offsetY = 200;
+
+						// Convert to screen coordinates
+						const screenX =
+							((this.player.gridX - this.player.gridY) * this.tileWidth) / 2 +
+							offsetX;
+						const screenY =
+							((this.player.gridX + this.player.gridY) * this.tileHeight) / 2 +
+							offsetY -
+							16;
+
+						// Smooth movement
+						this.tweens.add({
+							targets: this.player,
+							x: screenX,
+							y: screenY,
+							duration: 150,
+							ease: "Linear",
+						});
+
+						// Update depth
+						this.updatePlayerDepth();
+					}
+				}
+
+				isValidPosition(gridX, gridY) {
+					// Check boundaries
+					if (
+						gridX < 0 ||
+						gridX >= this.roomWidth ||
+						gridY < 0 ||
+						gridY >= this.roomHeight
+					) {
+						return false;
+					}
+
+					// Check collision with items
+					let collision = false;
+					this.items.getChildren().forEach((item) => {
+						if (item.gridX === gridX && item.gridY === gridY) {
+							collision = true;
+						}
+					});
+
+					return !collision;
+				}
+
+				checkItemInteraction() {
+					this.activeItem = null;
+					this.interactText.setVisible(false);
+
+					// Check for items adjacent to the player
+					this.items.getChildren().forEach((item) => {
+						// Check if item is adjacent (including diagonally)
+						const dx = Math.abs(this.player.gridX - item.gridX);
+						const dy = Math.abs(this.player.gridY - item.gridY);
+
+						if (dx <= 1 && dy <= 1) {
+							this.activeItem = item;
+							this.interactText.setText(`Press E to examine the ${item.name}`);
+							this.interactText.setVisible(true);
+						}
+					});
+				}
+
+				update() {
+					// Handle movement input with a slight delay to prevent diagonal speedup
+					if (this.canMove) {
+						let moved = false;
+
+						if (this.cursors.left.isDown) {
+							this.movePlayer(-1, 0);
+							moved = true;
+						} else if (this.cursors.right.isDown) {
+							this.movePlayer(1, 0);
+							moved = true;
+						} else if (this.cursors.up.isDown) {
+							this.movePlayer(0, -1);
+							moved = true;
+						} else if (this.cursors.down.isDown) {
+							this.movePlayer(0, 1);
+							moved = true;
+						}
+
+						if (moved) {
+							// Prevent movement until key is released
+							this.canMove = false;
+
+							// Reset canMove when all arrow keys are released
+							this.input.keyboard.once("keyup", () => {
+								if (
+									!this.cursors.left.isDown &&
+									!this.cursors.right.isDown &&
+									!this.cursors.up.isDown &&
+									!this.cursors.down.isDown
+								) {
+									this.canMove = true;
+								}
+							});
+						}
+					}
+
+					// Check for item interaction
+					this.checkItemInteraction();
+
+					// Handle interaction
+					if (
+						Phaser.Input.Keyboard.JustDown(this.interactKey) &&
+						this.activeItem
+					) {
+						const desc = this.add
+							.text(400, 300, this.activeItem.description, {
+								fontSize: "18px",
+								fill: "#fff",
+								backgroundColor: "#000",
+								padding: { x: 15, y: 10 },
+								wordWrap: { width: 500 },
+							})
+							.setOrigin(0.5)
+							.setScrollFactor(0)
+							.setDepth(1000)
+							.setAlpha(0)
+							.setData("destroyTimer", 3000)
+							.setData("createTime", this.time.now)
+							.setInteractive()
+							.on("pointerdown", function () {
+								this.destroy();
+							});
+
+						// Fade in
+						this.tweens.add({
+							targets: desc,
+							alpha: 1,
+							duration: 200,
+						});
+					}
+
+					// Clean up old descriptions
+					this.children.each((child) => {
+						if (child.getData("destroyTimer")) {
+							if (
+								this.time.now >
+								child.getData("createTime") + child.getData("destroyTimer")
+							) {
+								this.tweens.add({
+									targets: child,
+									alpha: 0,
+									duration: 200,
+									onComplete: function () {
+										child.destroy();
+									},
+								});
+							}
+						}
+					});
+				}
+			}
+
+			// Game configuration
+			const config = {
+				type: Phaser.AUTO,
+				width: 800,
+				height: 600,
+				backgroundColor: "#5e3f6b",
+				scene: [IsometricScene],
+				physics: {
+					default: "arcade",
+					arcade: {
+						debug: false,
+					},
+				},
+			};
+
+			// Initialize the game
+			const game = new Phaser.Game(config);
+		</script>
+	</body>
+</html>
