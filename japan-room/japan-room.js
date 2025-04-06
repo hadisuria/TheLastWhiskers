@@ -237,7 +237,7 @@ function create() {
 
 	// Add visible player for debugging - place in a good starting position inside the room
 	console.log("Adding player...");
-	player = this.add.rectangle(400, 400, 20, 20, 0x00ff00, 1);
+	player = this.add.rectangle(400, 420, 20, 20, 0x00ff00, 1);
 	this.physics.add.existing(player);
 	player.body.setCollideWorldBounds(true);
 	console.log("Player added:", player);
