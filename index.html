@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>The Last Whiskers - Cozy Memorial Space</title>
+	<!-- Google Fonts -->
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--color-bg-dark: #120e0b;
+			--color-bg-card: rgba(30, 24, 20, 0.85);
+			--color-primary: #d4a373;
+			--color-primary-hover: #e9c46a;
+			--color-accent: #e07a5f;
+			--color-text-light: #f4f1de;
+			--color-text-muted: #b5a89e;
+			--font-sans: 'Outfit', sans-serif;
+			--font-serif: 'Playfair Display', serif;
+			--shadow-premium: 0 20px 40px rgba(0, 0, 0, 0.6);
+			--border-glass: 1px solid rgba(212, 163, 115, 0.15);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			background-color: var(--color-bg-dark);
+			color: var(--color-text-light);
+			font-family: var(--font-sans);
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: flex-start;
+			overflow-x: hidden;
+			background-image: 
+				radial-gradient(circle at 10% 20%, rgba(212, 163, 115, 0.05) 0%, transparent 40%),
+				radial-gradient(circle at 90% 80%, rgba(224, 122, 95, 0.05) 0%, transparent 40%);
+			background-attachment: fixed;
+		}
+
+		header {
+			margin-top: 2rem;
+			margin-bottom: 1.5rem;
+			text-align: center;
+			z-index: 10;
+		}
+
+		h1 {
+			font-family: var(--font-serif);
+			font-size: 2.8rem;
+			font-weight: 700;
+			letter-spacing: 1px;
+			color: var(--color-primary);
+			text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+			margin-bottom: 0.5rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.8rem;
+		}
+
+		.subtitle {
+			font-family: var(--font-sans);
+			font-size: 1.1rem;
+			font-weight: 300;
+			color: var(--color-text-muted);
+			letter-spacing: 2px;
+			text-transform: uppercase;
+		}
+
+		.main-container {
+			display: flex;
+			flex-direction: row;
+			gap: 2rem;
+			max-width: 1650px;
+			width: 95%;
+			align-items: flex-start;
+			justify-content: center;
+			margin-bottom: 3rem;
+			transition: all 0.3s ease;
+		}
+
+		/* Game Screen Frame */
+		.game-wrapper {
+			flex: 2 1 1200px;
+			width: 100%;
+			max-width: 1200px;
+			aspect-ratio: 800 / 600;
+			position: relative;
+			background: var(--color-bg-card);
+			border: var(--border-glass);
+			border-radius: 16px;
+			padding: 16px;
+			box-shadow: var(--shadow-premium);
+			backdrop-filter: blur(10px);
+			overflow: hidden;
+			transition: all 0.3s ease;
+		}
+
+		.game-wrapper::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 3px;
+			background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+		}
+
+		.game-frame {
+			width: 100%;
+			height: 100%;
+			border: none;
+			border-radius: 8px;
+			display: block;
+			background-color: #333;
+		}
+
+		/* Sidebar Dashboard */
+		.sidebar {
+			flex: 1;
+			background: var(--color-bg-card);
+			border: var(--border-glass);
+			border-radius: 16px;
+			padding: 24px;
+			box-shadow: var(--shadow-premium);
+			backdrop-filter: blur(10px);
+			max-width: 360px;
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+			transition: all 0.3s ease;
+		}
+
+		.section-title {
+			font-family: var(--font-serif);
+			font-size: 1.4rem;
+			color: var(--color-primary);
+			border-bottom: 1px solid rgba(212, 163, 115, 0.2);
+			padding-bottom: 0.5rem;
+			margin-bottom: 0.8rem;
+		}
+
+		.control-group {
+			display: flex;
+			flex-direction: column;
+			gap: 0.8rem;
+		}
+
+		.control-item {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+		}
+
+		.key-cap {
+			background: #3a2e26;
+			border: 1px solid #5c4a3e;
+			border-bottom: 3px solid #231c17;
+			border-radius: 6px;
+			padding: 4px 10px;
+			font-family: monospace;
+			font-size: 0.9rem;
+			font-weight: bold;
+			color: var(--color-primary);
+			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+			text-align: center;
+			min-width: 32px;
+		}
+
+		.control-desc {
+			font-size: 0.95rem;
+			color: var(--color-text-light);
+		}
+
+		.item-list {
+			list-style: none;
+			display: flex;
+			flex-direction: column;
+			gap: 0.8rem;
+		}
+
+		.item-bullet {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+			font-size: 0.9rem;
+			line-height: 1.4;
+			color: var(--color-text-muted);
+		}
+
+		.item-bullet strong {
+			color: var(--color-primary);
+		}
+
+		.btn-fullscreen {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 8px;
+			background: linear-gradient(135deg, var(--color-primary), #b58353);
+			color: #120e0b;
+			border: none;
+			border-radius: 8px;
+			padding: 12px;
+			font-weight: 600;
+			cursor: pointer;
+			transition: all 0.2s ease;
+			font-family: var(--font-sans);
+			font-size: 1rem;
+			margin-top: 1rem;
+		}
+
+		.btn-fullscreen:hover {
+			background: linear-gradient(135deg, var(--color-primary-hover), var(--color-primary));
+			transform: translateY(-2px);
+			box-shadow: 0 5px 15px rgba(212, 163, 115, 0.4);
+		}
+
+		.btn-fullscreen:active {
+			transform: translateY(0);
+		}
+
+		footer {
+			margin-top: auto;
+			padding: 2rem 0;
+			color: rgba(181, 168, 158, 0.4);
+			font-size: 0.85rem;
+			text-align: center;
+		}
+
+		/* Responsive Design */
+		@media (max-width: 1600px) {
+			.main-container {
+				flex-direction: column;
+				align-items: center;
+			}
+			.sidebar {
+				max-width: 1200px;
+				width: 100%;
+			}
+		}
+	</style>
+</head>
+<body>
+
+	<header>
+		<h1>🐾 The Last Whiskers</h1>
+		<div class="subtitle">A Cozy Interactive Memorial Space</div>
+	</header>
+
+	<main class="main-container">
+		<!-- Game Container -->
+		<div class="game-wrapper">
+			<iframe class="game-frame" src="japan-room/japan-room.html" title="Japanese Room Game Frame"></iframe>
+		</div>
+
+		<!-- Info Sidebar -->
+		<div class="sidebar">
+			<div>
+				<h2 class="section-title">🕹️ How to Play</h2>
+				<div class="control-group">
+					<div class="control-item">
+						<div style="display: flex; gap: 4px;">
+							<span class="key-cap">W</span>
+							<span class="key-cap">A</span>
+							<span class="key-cap">S</span>
+							<span class="key-cap">D</span>
+						</div>
+						<span class="control-desc">or <span class="key-cap">▲</span> <span class="key-cap">▼</span> <span class="key-cap">◀</span> <span class="key-cap">▶</span> to move</span>
+					</div>
+					<div class="control-item">
+						<span class="key-cap">E</span>
+						<span class="control-desc">Interact with nearby items / Enter room</span>
+					</div>
+					<div class="control-item">
+						<span class="key-cap">H</span>
+						<span class="control-desc">Toggle helper overlays</span>
+					</div>
+				</div>
+			</div>
+
+			<div>
+				<h2 class="section-title">🍵 Interactive Items</h2>
+				<ul class="item-list">
+					<li class="item-bullet">✨ <strong>Kotatsu</strong> - A cozy heated table with blanket & cushions.</li>
+					<li class="item-bullet">✨ <strong>Teapot</strong> - Ceramic teapot brewing fresh green tea.</li>
+					<li class="item-bullet">✨ <strong>Bookshelf</strong> - Filled with old scrolls, books, and mementos.</li>
+					<li class="item-bullet">✨ <strong>Bonsai</strong> - Meticulously cared-for miniature tree.</li>
+					<li class="item-bullet">✨ <strong>Cabinet</strong> - Contains traditional tea utensils.</li>
+					<li class="item-bullet">✨ <strong>Sliding Shoji Doors</strong> - Entrance to the Memorial Gallery Room.</li>
+				</ul>
+			</div>
+
+			<button class="btn-fullscreen" onclick="focusGame(true)">
+				🎮 Play & Center Game
+			</button>
+		</div>
+	</main>
+
+	<footer>
+		&copy; 2026 The Last Whiskers &bull; Built with Phaser 3
+	</footer>
+
+	<script>
+		function focusGame(shouldScroll = false) {
+			const iframe = document.querySelector('.game-frame');
+			if (shouldScroll) {
+				const wrapper = document.querySelector('.game-wrapper');
+				if (wrapper) {
+					wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				}
+			}
+			if (iframe) {
+				iframe.focus();
+				iframe.contentWindow.focus();
+			}
+		}
+		
+		// Auto-focus the game frame after page loads
+		window.addEventListener('load', () => {
+			setTimeout(() => focusGame(false), 500);
+		});
+	</script>
+</body>
+</html>
