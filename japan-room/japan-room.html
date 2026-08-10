@@ -4,20 +4,23 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Japanese Room Explorer</title>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"></script>
-		<script src="japan-room.js?v=2"></script>
+		<script type="module" src="/src/main.js"></script>
 		<style>
 			body {
 				margin: 0;
 				padding: 0;
-				background-color: #333;
+				background-color: transparent;
 				display: flex;
 				justify-content: center;
 				align-items: center;
 				height: 100vh;
+				overflow: hidden;
 			}
 			canvas {
 				display: block;
+				max-width: 100%;
+				max-height: 100%;
+				object-fit: contain;
 			}
 		</style>
 	</head>

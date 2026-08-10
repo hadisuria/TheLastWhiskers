@@ -1,0 +1,21 @@
+{
+  "name": "the-last-whiskers",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A cozy interactive memorial space dedicated to beloved cats, built with Phaser 3 and Vite.",
+  "type": "module",
+  "author": "",
+  "license": "",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "3.55.2"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}
+

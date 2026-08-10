@@ -1,0 +1,38 @@
+[
+  {
+    "left": {
+      "key": "album-kitten",
+      "title": "Tiny Beginnings",
+      "desc": "First day home. So small, she was constantly exploring the rugs with soft meows."
+    },
+    "right": {
+      "key": "album-milo",
+      "title": "Milo's High Ground",
+      "desc": "Milo immediately claimed the top of the cabinet. A natural explorer from the start."
+    }
+  },
+  {
+    "left": {
+      "key": "album-sleeping",
+      "title": "Sunny Naps",
+      "desc": "Luna spent her afternoons searching for the warmest, sunniest spot on the tatami."
+    },
+    "right": {
+      "key": "album-luna",
+      "title": "Luna's Curiosity",
+      "desc": "Luna's favorite hiding spot—a cozy little basket where she felt safe and sound."
+    }
+  },
+  {
+    "left": {
+      "key": "album-window",
+      "title": "Window Watching",
+      "desc": "Spending hours looking out at the rain, dreaming of butterflies outside."
+    },
+    "right": {
+      "key": "album-oliver",
+      "title": "Oliver's Vigil",
+      "desc": "Oliver sitting perfectly still, keeping watch over the garden and the falling leaves."
+    }
+  }
+]

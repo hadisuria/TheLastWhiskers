@@ -157,7 +157,15 @@
 		.control-item {
 			display: flex;
 			align-items: center;
-			gap: 12px;
+			flex-wrap: wrap;
+			gap: 8px 12px;
+		}
+
+		.key-group {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			flex-wrap: wrap;
 		}
 
 		.key-cap {
@@ -173,11 +181,14 @@
 			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 			text-align: center;
 			min-width: 32px;
+			white-space: nowrap;
+			flex-shrink: 0;
 		}
 
 		.control-desc {
 			font-size: 0.95rem;
 			color: var(--color-text-light);
+			line-height: 1.4;
 		}
 
 		.item-list {
@@ -247,6 +258,15 @@
 				width: 100%;
 			}
 		}
+
+		@media (max-width: 600px) {
+			.sidebar {
+				padding: 16px;
+			}
+			.control-item {
+				gap: 6px 10px;
+			}
+		}
 	</style>
 </head>
 <body>
@@ -267,14 +287,25 @@
 			<div>
 				<h2 class="section-title">🕹️ How to Play</h2>
 				<div class="control-group">
+					<!-- Touch Device Control Note (4A) -->
 					<div class="control-item">
-						<div style="display: flex; gap: 4px;">
+						<span class="control-desc"><strong>Mobile/Touch</strong>: Use the on-screen D-pad and <strong>E</strong> action button.</span>
+					</div>
+					<div class="control-item">
+						<div class="key-group">
 							<span class="key-cap">W</span>
 							<span class="key-cap">A</span>
 							<span class="key-cap">S</span>
 							<span class="key-cap">D</span>
 						</div>
-						<span class="control-desc">or <span class="key-cap">▲</span> <span class="key-cap">▼</span> <span class="key-cap">◀</span> <span class="key-cap">▶</span> to move</span>
+						<span class="control-desc">or</span>
+						<div class="key-group">
+							<span class="key-cap">▲</span>
+							<span class="key-cap">▼</span>
+							<span class="key-cap">◀</span>
+							<span class="key-cap">▶</span>
+						</div>
+						<span class="control-desc">to move (Keyboard)</span>
 					</div>
 					<div class="control-item">
 						<span class="key-cap">E</span>
@@ -282,20 +313,27 @@
 					</div>
 					<div class="control-item">
 						<span class="key-cap">H</span>
-						<span class="control-desc">Toggle helper overlays</span>
+						<span class="control-desc">Toggle helper overlays (Keyboard)</span>
+					</div>
+					<!-- Audio Controls Note (4B) -->
+					<div class="control-item">
+						<span class="control-desc"><strong>Audio</strong>: Click the 🔊/🔇 button in the game window to toggle sound.</span>
 					</div>
 				</div>
 			</div>
 
+			<!-- NOTE: If you modify the interactive items list below, also update src/data/rooms/japanese-room.json and README.md. -->
 			<div>
 				<h2 class="section-title">🍵 Interactive Items</h2>
 				<ul class="item-list">
 					<li class="item-bullet">✨ <strong>Kotatsu</strong> - A cozy heated table with blanket & cushions.</li>
 					<li class="item-bullet">✨ <strong>Teapot</strong> - Ceramic teapot brewing fresh green tea.</li>
-					<li class="item-bullet">✨ <strong>Bookshelf</strong> - Filled with old scrolls, books, and mementos.</li>
+					<li class="item-bullet">✨ <strong>Bookshelf</strong> - Filled with old scrolls, books, and mementos (opens photo album).</li>
 					<li class="item-bullet">✨ <strong>Bonsai</strong> - Meticulously cared-for miniature tree.</li>
 					<li class="item-bullet">✨ <strong>Cabinet</strong> - Contains traditional tea utensils.</li>
 					<li class="item-bullet">✨ <strong>Sliding Shoji Doors</strong> - Entrance to the Memorial Gallery Room.</li>
+					<li class="item-bullet">✨ <strong>Lantern</strong> - Paper lantern casting a warm, gentle light.</li>
+					<li class="item-bullet">✨ <strong>Plant</strong> - A small potted plant adding a touch of green.</li>
 				</ul>
 			</div>
 

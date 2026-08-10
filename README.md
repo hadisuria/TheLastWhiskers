@@ -1,82 +1,83 @@
 # 🐾 The Last Whiskers
 
-A cozy interactive memorial space built with Phaser 3. Explore a traditional Japanese room and a Memorial Gallery dedicated to beloved kitties.
+A cozy interactive memorial space built with Phaser 3 and Vite. Explore a traditional Japanese room and a Memorial Gallery dedicated to beloved kitties.
 
 ## 📸 Demo Preview
 
-You can see the visual assets and screenshot in the [docs](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/docs/image.png) directory.
+You can see the visual assets and screenshot in the [docs/image.png](docs/image.png) directory.
 
 ---
 
 ## 🚀 How to Run Locally
 
-Since this is a static client-side web application, browser security policies (CORS) prevent loading local assets (like images and spritesheets) directly from a local file path (`file://`). You **must** run a local web server from the project root directory.
+### Prerequisites
+* **Node.js**: Recommended version 18 or higher (tested and built with Node 18+).
 
-Here are the easiest ways to start the server:
+### 1. Install Dependencies
+Ensure Node.js is installed, then install project dependencies:
+```bash
+npm install
+```
 
-### Option 1: Python (Recommended & Built-in)
+### 2. Run in Development Mode
+Start the Vite local development server:
+```bash
+npm run dev
+```
+Open your browser and navigate to the address shown in your terminal (typically `http://localhost:5173/`).
 
-If you have Python installed, you can start the built-in HTTP server:
+### 3. Build & Preview Production
+To build the static bundle for production and preview it locally:
+```bash
+# Build the production bundle
+npm run build
 
-1. Open a terminal/command prompt at the project root directory:
-   `c:\Users\jordy\Documents\1Hadi\Documents\Fun Projects\TheLastWhiskers`
-2. Run the server command:
-   ```bash
-   python -m http.server 8000
-   ```
-3. Open your browser and navigate to:
-   [http://localhost:8000/](http://localhost:8000/) (if you have the root `index.html`) or directly to the game:
-   [http://localhost:8000/japan-room/japan-room.html](http://localhost:8000/japan-room/japan-room.html)
-
----
-
-### Option 2: Node.js (npx)
-
-If you have Node.js installed, you can use the `http-server` package via `npx` without installing it globally:
-
-1. Open your terminal at the project root directory.
-2. Run the server command:
-   ```bash
-   npx http-server -p 8000
-   ```
-3. Open your browser and navigate to:
-   [http://localhost:8000/japan-room/japan-room.html](http://localhost:8000/japan-room/japan-room.html)
-
----
-
-### Option 3: VS Code Live Server Extension
-
-If you use VS Code:
-
-1. Install the **Live Server** extension by Ritwick Dey.
-2. Right-click on [japan-room.html](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/japan-room/japan-room.html) in the file explorer.
-3. Click **"Open with Live Server"**.
+# Preview the build output locally
+npm run preview
+```
 
 ---
 
 ## 🎮 Game Controls
 
-- **Move**: Use `WASD` keys or `Arrow Keys` to move the cute kitty around the room.
-- **Interact**: Press `E` when standing close to interactive items to inspect them and read their stories.
-- **Help Overlays**: Press `H` to toggle debug outlines and see where the physical room boundaries and interactive items are located.
+| Control | Action | Keyboard / Mouse | Touch Devices (4A) |
+|---|---|---|---|
+| **Move** | Walk around the room | `WASD` or `Arrow Keys` | On-screen D-pad (automatic detection) |
+| **Interact** | Inspect items, flip pages, zoom photos, or use doors | `E` or Click/Tap target | On-screen `E` button |
+| **Help Overlays** | Toggle physical boundary outlines | `H` | *N/A (Keyboard-only)* |
+| **Toggle Mute** | Mute/unmute game audio (4B) | Click audio button (🔊/🔇) | Tap audio button (🔊/🔇) |
 
 ---
 
 ## 🗺️ Interactive Elements
 
-Explore these objects in the Japanese room by moving close to them and pressing `E`:
+Explore these objects in the Japanese room (defined as the source of truth in [src/data/rooms/japanese-room.json](src/data/rooms/japanese-room.json) and summarized in index.html):
 * **Kotatsu**: A traditional Japanese heated table with a warm blanket.
 * **Teapot**: A ceramic teapot with freshly brewed green tea.
-* **Bookshelf**: A wooden bookshelf filled with scrolls, books, and mementos.
-* **Bonsai**: A miniature tree representing harmony.
+* **Bookshelf**: A wooden bookshelf filled with scrolls, books, and mementos (opens the photo album).
+* **Bonsai**: A miniature tree representing harmony with nature.
 * **Cabinet**: A wooden cabinet containing traditional tea ceremony utensils.
 * **Sliding Door**: Traditional shoji doors. Stand near them and press `E` to enter the **Memorial Gallery Room**.
+* **Lantern**: A paper lantern casting a warm, gentle light.
+* **Plant**: A small potted plant adding a touch of green.
 
 ---
 
 ## 📁 Project Structure
 
-* [japan-room/](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/japan-room) - Contains the entrypoint [japan-room.html](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/japan-room/japan-room.html) and game engine logic [japan-room.js](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/japan-room/japan-room.js).
-* [assets/](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/assets) - Contains room backgrounds, player sprites, and particle effects.
-* [docs/](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/docs) - Preview screenshots and developer notes.
-* [_supporting files/](file:///c:/Users/jordy/Documents/1Hadi/Documents/Fun%20Projects/TheLastWhiskers/_supporting%20files) - Palettes, pixel guides, and raw artwork references.
+* [src/main.js](src/main.js) - Primary game engine bootstrap config and Phaser scene definitions.
+* [src/scenes/](src/scenes/) - Phaser scenes (`PreloadScene`, `BaseRoomScene`, `JapaneseRoomScene`, `GalleryScene`).
+* [src/data/](src/data/) - Unified JSON layout and data files (`rooms/japanese-room.json`, `rooms/gallery.json`, `album.json`).
+* [src/ui/](src/ui/) - Custom UI controllers, modals, and mobile touch pads (`Modal.js`, `TouchControls.js`).
+* [src/utils/](src/utils/) - Shared utility functions (`geometry.js`).
+* [src/AudioManager.js](src/AudioManager.js) - Sound loading, playback, rate-limiting, and mute state.
+* [japan-room/japan-room.html](japan-room/japan-room.html) - Dedicated Phaser canvas container loaded inside the parent landing page.
+* [index.html](index.html) - Main dashboard landing page with CSS styling, instructions, and iframe wrapper.
+* [assets/](assets/) - Room backgrounds, spritesheets, photos, and audio files.
+* [docs/](docs/) - Preview screenshots and developers' design notes.
+* [_supporting files/](_supporting%20files/) - Palettes, pixel guides, and raw artwork references.
+
+---
+
+## 📝 Status Note
+Automated testing, linting configurations, and continuous integration (CI) workflows were intentionally omitted from the current project scope by decision. Manual validation is used to test features.
