@@ -76,19 +76,17 @@ export default class TouchControls {
 		container.id = 'tlw-touch-controls';
 		container.style.cssText = `
 			position: fixed;
-			bottom: 0;
-			left: 0;
-			right: 0;
-			height: 200px;
+			bottom: 10px;
+			left: 10px;
+			right: 10px;
 			pointer-events: none;
 			display: flex;
 			justify-content: space-between;
 			align-items: flex-end;
-			padding: 16px 20px;
-			box-sizing: border-box;
 			z-index: 9999;
 			user-select: none;
 			-webkit-user-select: none;
+			touch-action: none;
 		`;
 
 		// D-pad
@@ -107,17 +105,17 @@ export default class TouchControls {
 		const dpad = document.createElement('div');
 		dpad.style.cssText = `
 			position: relative;
-			width: 150px;
-			height: 150px;
+			width: min(135px, 30vw);
+			height: min(135px, 30vw);
 			pointer-events: none;
 		`;
 
 		// Direction config: [direction, label, top, left]
 		const directions = [
-			['up',    '▲', '0px',    '50px'],
-			['down',  '▼', '100px',  '50px'],
-			['left',  '◀', '50px',   '0px'],
-			['right', '▶', '50px',   '100px'],
+			['up',    '▲', '0%',    '33.33%'],
+			['down',  '▼', '66.66%','33.33%'],
+			['left',  '◀', '33.33%','0%'],
+			['right', '▶', '33.33%','66.66%'],
 		];
 
 		directions.forEach(([dir, label, top, left]) => {
@@ -127,13 +125,13 @@ export default class TouchControls {
 				position: absolute;
 				top: ${top};
 				left: ${left};
-				width: 50px;
-				height: 50px;
+				width: 33.33%;
+				height: 33.33%;
 				border-radius: 8px;
 				border: 2px solid rgba(212,175,55,0.6);
 				background: rgba(42,28,18,0.72);
 				color: #F7E9D7;
-				font-size: 20px;
+				font-size: min(18px, 4vw);
 				line-height: 1;
 				display: flex;
 				align-items: center;
@@ -176,13 +174,13 @@ export default class TouchControls {
 		const btn = document.createElement('button');
 		btn.setAttribute('aria-label', 'Interact');
 		btn.style.cssText = `
-			width: 80px;
-			height: 80px;
+			width: min(72px, 16vw);
+			height: min(72px, 16vw);
 			border-radius: 50%;
 			border: 3px solid rgba(212,175,55,0.75);
 			background: rgba(42,28,18,0.78);
 			color: #F7E9D7;
-			font-size: 15px;
+			font-size: min(14px, 3.5vw);
 			font-family: monospace;
 			font-weight: bold;
 			pointer-events: all;
@@ -193,8 +191,12 @@ export default class TouchControls {
 			touch-action: none;
 			line-height: 1.2;
 			letter-spacing: 0.05em;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
 		`;
-		btn.textContent = 'E\n✦';
+		btn.innerHTML = '<span>E</span><span style="font-size: 0.8em">✦</span>';
 
 		const press = (e) => {
 			e.preventDefault();

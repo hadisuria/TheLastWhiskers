@@ -36,11 +36,11 @@ export default class GalleryScene extends BaseRoomScene {
 		// Interactive areas: 3 photos + exit door
 		this.createInteractiveAreas();
 
-		// 4C — Cat animations (GalleryScene reuses the 'cat' texture/anims from cache)
-		this.createCatAnimations();
-
 		// Setup Player
 		this.setupPlayer();
+
+		// 4C — Cat animations (GalleryScene reuses the 'cat' texture/anims from cache)
+		this.createCatAnimations();
 
 		// Setup UI
 		this.setupUI();
@@ -139,7 +139,7 @@ export default class GalleryScene extends BaseRoomScene {
 
 	setupUI() {
 		this.interactText = this.add
-			.text(400, 550, "", {
+			.text(400, 530, "", {
 				fontSize: "16px",
 				fontFamily: "monospace",
 				fill: "#F7E9D7",
@@ -149,14 +149,19 @@ export default class GalleryScene extends BaseRoomScene {
 				strokeThickness: 2,
 			})
 			.setOrigin(0.5)
-			.setDepth(10);
+			.setDepth(150);
 		this.interactText.setVisible(false);
+
+		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const bannerText = isTouch
+			? "Tap screen / D-pad to move • Tap E or photos to inspect"
+			: "Memorial Photo Room. E to inspect photos. H to toggle help overlays.";
 
 		this.add
 			.text(
 				400,
-				50,
-				"Memorial Photo Room. E to inspect photos. H to toggle help overlays.",
+				45,
+				bannerText,
 				{
 					fontSize: "15px",
 					fontFamily: "monospace",
@@ -168,7 +173,7 @@ export default class GalleryScene extends BaseRoomScene {
 				},
 			)
 			.setOrigin(0.5)
-			.setDepth(10);
+			.setDepth(150);
 
 		this.coordText = this.add
 			.text(10, 10, "Player: x=0, y=0", {
@@ -178,7 +183,7 @@ export default class GalleryScene extends BaseRoomScene {
 				backgroundColor: "#000000",
 				padding: { x: 5, y: 2 },
 			})
-			.setDepth(10);
+			.setDepth(150);
 
 		// 4B — Mute toggle button
 		this.createMuteButton();
@@ -314,8 +319,10 @@ export default class GalleryScene extends BaseRoomScene {
 				container.add(descText);
 
 				// Prompt to close
+				const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+				const closeStr = isTouch ? "Tap anywhere or Press E to Close" : "Click or Press E to Close";
 				const closePrompt = this.add
-					.text(400, 495, "Click or Press E to Close", {
+					.text(400, 495, closeStr, {
 						fontSize: "12px",
 						fontFamily: "monospace",
 						fill: "#7A6855",

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { preloadAudio } from '../AudioManager.js';
+import { createTransparentTexture } from '../utils/textures.js';
 
 /**
  * PreloadScene — Phase 4D Loading Screen
@@ -218,6 +219,8 @@ export default class PreloadScene extends Phaser.Scene {
 		if (this._fileLabel && this._fileLabel.active) {
 			this._fileLabel.setText('');
 		}
+
+		createTransparentTexture(this, 'cat', 'cat-raw');
 
 		// Brief pause, then fade to black and start the room
 		this.time.delayedCall(600, () => {

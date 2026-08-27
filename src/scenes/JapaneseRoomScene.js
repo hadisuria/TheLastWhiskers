@@ -22,12 +22,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 	// (Phase 4D). Adding new assets: add them to PreloadScene.preload() instead.
 
 	create() {
-		// Clean / transparentize the player sprite background dynamically
-		this.createTransparentTexture("cat", "cat-raw");
-
-		// 4C — Register cat animations (single-frame fallback until real spritesheet added)
-		this.createCatAnimations();
-
 		// Initialize state properties
 		this.interactableItems = [];
 		this.activeItem = null;
@@ -39,6 +33,10 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.createBoundaries();
 		this.createInteractiveAreas();
 		this.setupPlayer();
+
+		// 4C — Register cat animations (single-frame fallback until real spritesheet added)
+		this.createCatAnimations();
+
 		this.setupUI();
 
 		// Systems
@@ -46,123 +44,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 		// 4B — Audio (after scene is set up)
 		this.initAudio(true);
-	}
-
-	createTransparentTexture(key, sourceKey, tolerance = 40) {
-		if (!this.textures.exists(sourceKey)) {
-			console.warn(`Texture key ${sourceKey} does not exist.`);
-			return;
-		}
-		const sourceTexture = this.textures.get(sourceKey).getSourceImage();
-		if (!sourceTexture) {
-			console.error("Failed to find source image for key:", sourceKey);
-			return;
-		}
-
-		const canvas = document.createElement("canvas");
-		const width = sourceTexture.width;
-		const height = sourceTexture.height;
-		canvas.width = width;
-		canvas.height = height;
-		const ctx = canvas.getContext("2d");
-		ctx.drawImage(sourceTexture, 0, 0);
-
-		const imgData = ctx.getImageData(0, 0, width, height);
-		const data = imgData.data;
-
-		// Robust Chroma-Keying: Sample 8 points around corner regions
-		const samplePoints = [
-			[0, 0],
-			[width - 1, 0],
-			[0, height - 1],
-			[width - 1, height - 1],
-			[Math.min(2, width - 1), Math.min(2, height - 1)],
-			[Math.max(0, width - 3), Math.min(2, height - 1)],
-			[Math.min(2, width - 1), Math.max(0, height - 3)],
-			[Math.max(0, width - 3), Math.max(0, height - 3)],
-		];
-
-		const samples = [];
-		samplePoints.forEach(([x, y]) => {
-			const idx = (y * width + x) * 4;
-			const r = data[idx];
-			const g = data[idx + 1];
-			const b = data[idx + 2];
-			const a = data[idx + 3];
-
-			if (a > 50) {
-				samples.push({ r, g, b });
-			}
-		});
-
-		let performChromaKey = false;
-		let bgR = 0,
-			bgG = 0,
-			bgB = 0;
-
-		if (samples.length === 0) {
-			console.warn(
-				`Chroma-key: No opaque background pixels sampled for key "${sourceKey}".`,
-			);
-		} else {
-			// Group colors that are within color distance tolerance of each other
-			const clusters = [];
-			samples.forEach((s) => {
-				let matched = false;
-				for (const cluster of clusters) {
-					const dist = Math.sqrt(
-						Math.pow(s.r - cluster.r, 2) +
-							Math.pow(s.g - cluster.g, 2) +
-							Math.pow(s.b - cluster.b, 2),
-					);
-					if (dist < 30) {
-						cluster.count++;
-						matched = true;
-						break;
-					}
-				}
-				if (!matched) {
-					clusters.push({ r: s.r, g: s.g, b: s.b, count: 1 });
-				}
-			});
-
-			clusters.sort((a, b) => b.count - a.count);
-			const bestCluster = clusters[0];
-
-			if (bestCluster.count >= Math.ceil(samples.length / 2)) {
-				performChromaKey = true;
-				bgR = bestCluster.r;
-				bgG = bestCluster.g;
-				bgB = bestCluster.b;
-			} else {
-				console.warn(
-					`Chroma-key: Disagreement among background sample points for key "${sourceKey}". Max count ${bestCluster.count}/${samples.length}. Keeping texture untouched.`,
-				);
-			}
-		}
-
-		if (performChromaKey) {
-			for (let i = 0; i < data.length; i += 4) {
-				const r = data[i];
-				const g = data[i + 1];
-				const b = data[i + 2];
-
-				const dist = Math.sqrt(
-					Math.pow(r - bgR, 2) + Math.pow(g - bgG, 2) + Math.pow(b - bgB, 2),
-				);
-
-				if (dist < tolerance) {
-					data[i + 3] = 0; // Set alpha to 0
-				}
-			}
-			ctx.putImageData(imgData, 0, 0);
-		}
-
-		// ALWAYS add the texture to Phaser's texture manager so the sprite key is registered!
-		if (this.textures.exists(key)) {
-			this.textures.remove(key);
-		}
-		this.textures.addCanvas(key, canvas);
 	}
 
 	setupRoom() {
@@ -255,7 +136,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 	setupUI() {
 		this.interactText = this.add
-			.text(400, 550, "", {
+			.text(400, 530, "", {
 				fontSize: "16px",
 				fontFamily: "monospace",
 				fill: "#F7E9D7",
@@ -264,14 +145,20 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 				stroke: "#000000",
 				strokeThickness: 2,
 			})
-			.setOrigin(0.5);
+			.setOrigin(0.5)
+			.setDepth(150);
 		this.interactText.setVisible(false);
+
+		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const bannerText = isTouch
+			? "Tap screen / D-pad to move • Tap E or items to interact"
+			: "Arrow keys / WASD to move. E to interact. H to toggle help overlays.";
 
 		this.add
 			.text(
 				400,
-				50,
-				"Arrow keys / WASD to move. E to interact. H to toggle help overlays.",
+				45,
+				bannerText,
 				{
 					fontSize: "15px",
 					fontFamily: "monospace",
@@ -282,7 +169,8 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 					strokeThickness: 2,
 				},
 			)
-			.setOrigin(0.5);
+			.setOrigin(0.5)
+			.setDepth(150);
 
 		this.coordText = this.add.text(10, 10, "Player: x=0, y=0", {
 			fontSize: "14px",
@@ -290,7 +178,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			fill: "#FFFFFF",
 			backgroundColor: "#000000",
 			padding: { x: 5, y: 2 },
-		});
+		}).setDepth(150);
 
 		// 4B — Mute toggle button (top-right corner)
 		this.createMuteButton();
@@ -455,10 +343,35 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.isAlbumOpen = true;
 		this.albumCurrentPage = 0;
 
+		let touchStartX = 0;
+		let touchStartY = 0;
+
+		const onPointerDown = (pointer) => {
+			touchStartX = pointer.x;
+			touchStartY = pointer.y;
+		};
+
+		const onPointerUp = (pointer) => {
+			const dx = pointer.x - touchStartX;
+			const dy = pointer.y - touchStartY;
+			if (Math.abs(dx) > 40 && Math.abs(dy) < 60) {
+				if (dx < 0) {
+					this.flipPage(1);
+				} else {
+					this.flipPage(-1);
+				}
+			}
+		};
+
+		this.input.on('pointerdown', onPointerDown);
+		this.input.on('pointerup', onPointerUp);
+
 		openModal(this, {
 			overlayAlpha: 0.8,
 			onClose: () => {
 				this.isAlbumOpen = false;
+				this.input.off('pointerdown', onPointerDown);
+				this.input.off('pointerup', onPointerUp);
 			},
 			onKeyDown: (event) => {
 				if (
@@ -543,6 +456,20 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			})
 			.setOrigin(0.5);
 		this.albumPageContentContainer.add(headerText);
+
+		// Interactive tap zones for turning pages by clicking/tapping left or right page
+		if (pageIndex > 0) {
+			const leftZone = this.add.rectangle(235, 295, 310, 450, 0x000000, 0)
+				.setInteractive({ useHandCursor: true })
+				.on("pointerdown", () => this.flipPage(-1));
+			this.albumPageContentContainer.add(leftZone);
+		}
+		if (pageIndex < this.albumPagesData.length - 1) {
+			const rightZone = this.add.rectangle(565, 295, 310, 450, 0x000000, 0)
+				.setInteractive({ useHandCursor: true })
+				.on("pointerdown", () => this.flipPage(1));
+			this.albumPageContentContainer.add(rightZone);
+		}
 
 		// --- LEFT PAGE CONTENT ---
 		// Polaroid Frame (rotated slightly counter-clockwise)
@@ -676,11 +603,12 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		if (pageIndex > 0) {
 			const prevBtn = this.add
 				.text(35, 290, "◀", {
-					fontSize: "36px",
+					fontSize: "40px",
 					fontFamily: "Arial",
 					color: "#d4a373",
 					stroke: "#1a0f0d",
-					strokeThickness: 2,
+					strokeThickness: 3,
+					padding: { x: 15, y: 15 },
 				})
 				.setOrigin(0.5)
 				.setInteractive({ useHandCursor: true })
@@ -694,11 +622,12 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		if (pageIndex < this.albumPagesData.length - 1) {
 			const nextBtn = this.add
 				.text(765, 290, "▶", {
-					fontSize: "36px",
+					fontSize: "40px",
 					fontFamily: "Arial",
 					color: "#d4a373",
 					stroke: "#1a0f0d",
-					strokeThickness: 2,
+					strokeThickness: 3,
+					padding: { x: 15, y: 15 },
 				})
 				.setOrigin(0.5)
 				.setInteractive({ useHandCursor: true })
@@ -709,11 +638,16 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		}
 
 		// Bottom Close Help Tip
+		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const promptStr = isTouch
+			? "Tap outside or ESC to Close • Tap pages, ◀ ▶ or Swipe to turn pages"
+			: "Click outside or Press E / ESC to Close • Use A/D or Left/Right arrows to turn pages";
+
 		const closePrompt = this.add
 			.text(
 				400,
 				560,
-				"Click outside or Press E / ESC to Close • Use A/D or Left/Right arrows to turn pages",
+				promptStr,
 				{
 					fontSize: "12px",
 					fontFamily: "monospace",

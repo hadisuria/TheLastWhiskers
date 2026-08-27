@@ -135,10 +135,6 @@ export default class BaseRoomScene extends Phaser.Scene {
 		const isMoving = vx !== 0 || vy !== 0;
 		const targetAnim = isMoving ? ANIM_CONFIG.walk.key : ANIM_CONFIG.idle.key;
 
-		// Ensure the animations are registered.
-		// When transitioning back to a scene, if the scene restarts, we make sure they exist.
-		this.createCatAnimations();
-
 		// Check if animation exists in cache before playing, or fallback to texture
 		if (!this.anims.exists(targetAnim)) {
 			// Fallback: If animations are somehow missing/unregistered, use static frame 0 (if texture exists)
@@ -194,13 +190,36 @@ export default class BaseRoomScene extends Phaser.Scene {
 			vy *= 0.7071;
 		}
 
-		// --- Touch input (4A) ------------------------------------------------
+		// --- Touch D-pad input (4A) ------------------------------------------
 		if (this.touchControls) {
 			this.touchControls.update();
 			const tv = this.touchControls.touchVelocity;
 			// Merge: touch overrides keyboard on the axes it supplies
-			if (tv.x !== 0) vx = tv.x;
-			if (tv.y !== 0) vy = tv.y;
+			if (tv.x !== 0 || tv.y !== 0) {
+				vx = tv.x;
+				vy = tv.y;
+				this.moveTarget = null; // Manual D-pad cancels tap destination
+			}
+		}
+
+		if (vx !== 0 || vy !== 0) {
+			this.moveTarget = null; // Manual keyboard cancels tap destination
+		} else if (this.moveTarget) {
+			// Tap-to-move destination navigation
+			const dx = this.moveTarget.x - this.player.x;
+			const dy = this.moveTarget.y - this.player.y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+
+			if (dist < 10) {
+				this.moveTarget = null;
+				if (this.pendingItemInteraction) {
+					this.tapInteractRequested = true;
+					this.pendingItemInteraction = null;
+				}
+			} else {
+				vx = (dx / dist) * speed;
+				vy = (dy / dist) * speed;
+			}
 		}
 
 		playerBody.setVelocity(vx, vy);
@@ -269,12 +288,14 @@ export default class BaseRoomScene extends Phaser.Scene {
 		if (!pointInPolygon(testX, this.roomPolygon)) {
 			this.player.x = prevX;
 			this.player.body.setVelocityX(0);
+			if (this.moveTarget) this.moveTarget = null;
 		}
 
 		const testY = { x: prevX, y: nextY };
 		if (!pointInPolygon(testY, this.roomPolygon)) {
 			this.player.y = prevY;
 			this.player.body.setVelocityY(0);
+			if (this.moveTarget) this.moveTarget = null;
 		}
 	}
 
@@ -326,13 +347,15 @@ export default class BaseRoomScene extends Phaser.Scene {
 
 	/**
 	 * Returns true if the E key was just pressed OR the touch interact button
-	 * was tapped. Consumes the touch press so it's only reported once.
+	 * was tapped OR a tap-to-move destination near an item was reached.
 	 * @returns {boolean}
 	 */
 	isInteractJustPressed() {
 		const keyboard = Phaser.Input.Keyboard.JustDown(this.interactKey);
 		const touch = this.touchControls ? this.touchControls.consumeInteract() : false;
-		return keyboard || touch;
+		const tap = this.tapInteractRequested;
+		this.tapInteractRequested = false;
+		return keyboard || touch || tap;
 	}
 
 	// ---------------------------------------------------------------------------
@@ -341,10 +364,47 @@ export default class BaseRoomScene extends Phaser.Scene {
 
 	/**
 	 * Creates the TouchControls instance and attaches it to this scene.
-	 * Must be called after `this.interactKey` is defined.
+	 * Also sets up tap-to-move canvas pointer listener.
 	 */
 	setupTouchControls() {
 		this.touchControls = new TouchControls(this, 150);
+
+		// Pointer listener for tap-to-move on mobile/touch & desktop click
+		this.input.on('pointerdown', (pointer) => {
+			if (this.isAlbumOpen || this.isZoomed) return;
+
+			// Don't set move target if tapping top-right mute button
+			if (this._muteButton && this._muteButton.getBounds().contains(pointer.x, pointer.y)) {
+				return;
+			}
+
+			// Check if tapping on or near an interactable item
+			let tappedItem = null;
+			if (this.interactableItems) {
+				for (const item of this.interactableItems) {
+					const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, item.x, item.y);
+					if (dist < 45 || (pointer.x >= item.x - item.width/2 && pointer.x <= item.x + item.width/2 &&
+					                  pointer.y >= item.y - item.height/2 && pointer.y <= item.y + item.height/2)) {
+						tappedItem = item;
+						break;
+					}
+				}
+			}
+
+			if (tappedItem) {
+				const currentDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, tappedItem.x, tappedItem.y);
+				if (currentDist < 80) {
+					this.tapInteractRequested = true;
+					this.moveTarget = null;
+				} else {
+					this.moveTarget = { x: tappedItem.x, y: tappedItem.y };
+					this.pendingItemInteraction = tappedItem;
+				}
+			} else {
+				this.moveTarget = { x: pointer.x, y: pointer.y };
+				this.pendingItemInteraction = null;
+			}
+		});
 	}
 
 	// ---------------------------------------------------------------------------
@@ -358,16 +418,17 @@ export default class BaseRoomScene extends Phaser.Scene {
 	 */
 	createMuteButton() {
 		const btn = this.add
-			.text(780, 14, '🔊', {
-				fontSize: '20px',
+			.text(785, 12, '🔊', {
+				fontSize: '22px',
 				fontFamily: 'monospace',
 				backgroundColor: '#2d1a0e',
-				padding: { x: 6, y: 3 },
+				padding: { x: 10, y: 6 },
 			})
 			.setOrigin(1, 0)
 			.setDepth(300)
 			.setInteractive({ useHandCursor: true })
-			.on('pointerdown', () => {
+			.on('pointerdown', (pointer, localX, localY, event) => {
+				if (event && event.stopPropagation) event.stopPropagation();
 				if (!this.audio) return;
 				const muted = this.audio.toggleMute();
 				btn.setText(muted ? '🔇' : '🔊');
