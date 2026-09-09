@@ -69,13 +69,12 @@ Explore these objects in the Japanese room (defined as the source of truth in [s
 * [src/scenes/](src/scenes/) - Phaser scenes (`PreloadScene`, `BaseRoomScene`, `JapaneseRoomScene`, `GalleryScene`).
 * [src/data/](src/data/) - Unified JSON layout and data files (`rooms/japanese-room.json`, `rooms/gallery.json`, `album.json`).
 * [src/ui/](src/ui/) - Custom UI controllers, modals, and mobile touch pads (`Modal.js`, `TouchControls.js`).
-* [src/utils/](src/utils/) - Shared utility functions (`geometry.js`).
+* [src/utils/](src/utils/) - Shared utility functions (`geometry.js`, `textures.js`).
 * [src/AudioManager.js](src/AudioManager.js) - Sound loading, playback, rate-limiting, and mute state.
 * [japan-room/japan-room.html](japan-room/japan-room.html) - Dedicated Phaser canvas container loaded inside the parent landing page.
 * [index.html](index.html) - Main dashboard landing page with CSS styling, instructions, and iframe wrapper.
 * [assets/](assets/) - Room backgrounds, spritesheets, photos, and audio files.
-* [docs/](docs/) - Preview screenshots and developers' design notes.
-* [_supporting files/](_supporting%20files/) - Palettes, pixel guides, and raw artwork references.
+* [docs/](docs/) - Preview screenshots.
 
 ---
 

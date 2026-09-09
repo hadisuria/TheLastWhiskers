@@ -408,6 +408,155 @@ export default class BaseRoomScene extends Phaser.Scene {
 	}
 
 	// ---------------------------------------------------------------------------
+	// Shared Scene Setup Methods
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Creates invisible boundary walls along roomPolygon for visual debug display.
+	 */
+	createBoundaries() {
+		this.boundaries = this.add.group();
+		if (!this.roomPolygon || this.roomPolygon.length === 0) return;
+
+		const len = this.roomPolygon.length;
+		for (let i = 0; i < len; i++) {
+			const [x1, y1] = this.roomPolygon[i];
+			const [x2, y2] = this.roomPolygon[(i + 1) % len];
+
+			const centerX = (x1 + x2) / 2;
+			const centerY = (y1 + y2) / 2;
+			const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+			const angle = Math.atan2(y2 - y1, x2 - x1);
+
+			const wall = this.add.rectangle(centerX, centerY, length, 10);
+			wall.setRotation(angle);
+			wall.setFillStyle(this.boundaryColor || 0xff0000, 0.3);
+			wall.setAlpha(0);
+
+			this.boundaries.add(wall);
+		}
+	}
+
+	/**
+	 * Creates interactive physics rectangles and hidden text labels from roomItemsData.
+	 */
+	createInteractiveAreas() {
+		this.interactableItems = [];
+		if (!this.roomItemsData) return;
+
+		this.roomItemsData.forEach((item) => {
+			const colorNum = Number(item.color);
+			const graphics = this.add.rectangle(
+				item.x,
+				item.y,
+				item.width,
+				item.height,
+				colorNum,
+				0.5,
+			);
+			graphics.setAlpha(0);
+
+			this.physics.add.existing(graphics, true);
+
+			graphics.name = item.name;
+			graphics.type = item.type || "display";
+			graphics.description = item.description;
+			graphics.color = colorNum;
+			if (item.photoKey) graphics.photoKey = item.photoKey;
+			if (item.type === "room-exit") graphics.isExit = true;
+
+			const label = this.add
+				.text(item.x, item.y, item.name, {
+					fontSize: "12px",
+					fontFamily: "Arial",
+					color: "#FFFFFF",
+					backgroundColor: "#000000",
+					padding: { x: 3, y: 3 },
+				})
+				.setOrigin(0.5)
+				.setVisible(false);
+
+			graphics.label = label;
+			this.interactableItems.push(graphics);
+		});
+	}
+
+	/**
+	 * Spawns player sprite, configures physics body, inputs, and touch controls.
+	 */
+	setupPlayer() {
+		const [spawnX, spawnY] = this.playerSpawn || [400, 300];
+		this.player = this.physics.add.sprite(spawnX, spawnY, "cat");
+		this.player.setDisplaySize(40, 40);
+		this.player.body.setSize(30, 30);
+		this.player.body.setCollideWorldBounds(true);
+
+		if (this.interactableItems) {
+			this.physics.add.collider(this.player, this.interactableItems);
+		}
+
+		this.cursors = this.input.keyboard.createCursorKeys();
+		this.wasd = this.input.keyboard.addKeys({
+			up: Phaser.Input.Keyboard.KeyCodes.W,
+			down: Phaser.Input.Keyboard.KeyCodes.S,
+			left: Phaser.Input.Keyboard.KeyCodes.A,
+			right: Phaser.Input.Keyboard.KeyCodes.D,
+		});
+		this.interactKey = this.input.keyboard.addKey("E");
+		this.helpKey = this.input.keyboard.addKey("H");
+
+		this.setupTouchControls();
+	}
+
+	/**
+	 * Configures standard room HUD elements (interaction prompt, top banner, coordinates, mute button).
+	 * @param {string} bannerText
+	 */
+	setupUI(bannerText = "") {
+		this.interactText = this.add
+			.text(400, 530, "", {
+				fontSize: "16px",
+				fontFamily: "monospace",
+				fill: "#F7E9D7",
+				backgroundColor: "#4A3C31",
+				padding: { x: 10, y: 5 },
+				stroke: "#000000",
+				strokeThickness: 2,
+			})
+			.setOrigin(0.5)
+			.setDepth(150);
+		this.interactText.setVisible(false);
+
+		if (bannerText) {
+			this.add
+				.text(400, 45, bannerText, {
+					fontSize: "15px",
+					fontFamily: "monospace",
+					fill: "#F7E9D7",
+					backgroundColor: "#4A3C31",
+					padding: { x: 10, y: 5 },
+					stroke: "#000000",
+					strokeThickness: 2,
+				})
+				.setOrigin(0.5)
+				.setDepth(150);
+		}
+
+		this.coordText = this.add
+			.text(10, 10, "Player: x=0, y=0", {
+				fontSize: "14px",
+				fontFamily: "Arial",
+				fill: "#FFFFFF",
+				backgroundColor: "#000000",
+				padding: { x: 5, y: 2 },
+			})
+			.setDepth(150);
+
+		this.createMuteButton();
+		this.cameras.main.fadeIn(800, 0, 0, 0);
+	}
+
+	// ---------------------------------------------------------------------------
 	// 4B — Mute toggle UI button
 	// Creates a small on-screen 🔊/🔇 button rendered in the Phaser canvas.
 	// ---------------------------------------------------------------------------

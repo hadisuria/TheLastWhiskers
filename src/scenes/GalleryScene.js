@@ -21,7 +21,6 @@ export default class GalleryScene extends BaseRoomScene {
 	// (Phase 4D). Adding new assets: add them to PreloadScene.preload() instead.
 
 	create() {
-		this.interactableItems = [];
 		this.activeItem = null;
 		this.showHelpOverlays = false;
 		this.isZoomed = false;
@@ -30,166 +29,23 @@ export default class GalleryScene extends BaseRoomScene {
 		const bg = this.add.image(400, 300, "gallery-room");
 		bg.setDisplaySize(800, 600);
 
-		// Boundaries
+		// Setup base room components
 		this.createBoundaries();
-
-		// Interactive areas: 3 photos + exit door
 		this.createInteractiveAreas();
-
-		// Setup Player
 		this.setupPlayer();
-
-		// 4C — Cat animations (GalleryScene reuses the 'cat' texture/anims from cache)
 		this.createCatAnimations();
-
-		// Setup UI
-		this.setupUI();
-
-		// Systems
-		this.createParticleEffects();
-
-		// Help toggle key
-		this.helpKey = this.input.keyboard.addKey("H");
-
-		// 4B — Audio
-		this.initAudio(true);
-	}
-
-	createBoundaries() {
-		this.boundaries = this.add.group();
-
-		const len = this.roomPolygon.length;
-		for (let i = 0; i < len; i++) {
-			const [x1, y1] = this.roomPolygon[i];
-			const [x2, y2] = this.roomPolygon[(i + 1) % len];
-
-			const centerX = (x1 + x2) / 2;
-			const centerY = (y1 + y2) / 2;
-			const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-			const angle = Math.atan2(y2 - y1, x2 - x1);
-
-			const wall = this.add.rectangle(centerX, centerY, length, 10);
-			wall.setRotation(angle);
-			wall.setFillStyle(this.boundaryColor, 0.3);
-			wall.setAlpha(0); // Invisible by default
-
-			this.boundaries.add(wall);
-		}
-	}
-
-	createInteractiveAreas() {
-		this.roomItemsData.forEach((item) => {
-			const colorNum = Number(item.color);
-			const graphics = this.add.rectangle(
-				item.x,
-				item.y,
-				item.width,
-				item.height,
-				colorNum,
-				0.5,
-			);
-			graphics.setAlpha(0);
-
-			this.physics.add.existing(graphics, true);
-
-			graphics.name = item.name;
-			graphics.type = item.type || "photo-display";
-			graphics.description = item.description;
-			graphics.photoKey = item.photoKey || null;
-			graphics.isExit = item.type === "room-exit";
-			graphics.color = colorNum;
-
-			const label = this.add
-				.text(item.x, item.y, item.name, {
-					fontSize: "12px",
-					fontFamily: "Arial",
-					color: "#FFFFFF",
-					backgroundColor: "#000000",
-					padding: { x: 3, y: 3 },
-				})
-				.setOrigin(0.5)
-				.setVisible(false);
-
-			graphics.label = label;
-			this.interactableItems.push(graphics);
-		});
-	}
-
-	setupPlayer() {
-		const [spawnX, spawnY] = this.playerSpawn;
-		this.player = this.physics.add.sprite(spawnX, spawnY, "cat");
-		this.player.setDisplaySize(40, 40);
-		this.player.body.setSize(30, 30);
-		this.player.body.setCollideWorldBounds(true);
-
-		this.physics.add.collider(this.player, this.interactableItems);
-
-		this.cursors = this.input.keyboard.createCursorKeys();
-		this.wasd = this.input.keyboard.addKeys({
-			up: Phaser.Input.Keyboard.KeyCodes.W,
-			down: Phaser.Input.Keyboard.KeyCodes.S,
-			left: Phaser.Input.Keyboard.KeyCodes.A,
-			right: Phaser.Input.Keyboard.KeyCodes.D,
-		});
-		this.interactKey = this.input.keyboard.addKey("E");
-
-		// 4A — Touch controls
-		this.setupTouchControls();
-	}
-
-	setupUI() {
-		this.interactText = this.add
-			.text(400, 530, "", {
-				fontSize: "16px",
-				fontFamily: "monospace",
-				fill: "#F7E9D7",
-				backgroundColor: "#4A3C31",
-				padding: { x: 10, y: 5 },
-				stroke: "#000000",
-				strokeThickness: 2,
-			})
-			.setOrigin(0.5)
-			.setDepth(150);
-		this.interactText.setVisible(false);
 
 		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 		const bannerText = isTouch
 			? "Tap screen / D-pad to move • Tap E or photos to inspect"
 			: "Memorial Photo Room. E to inspect photos. H to toggle help overlays.";
+		this.setupUI(bannerText);
 
-		this.add
-			.text(
-				400,
-				45,
-				bannerText,
-				{
-					fontSize: "15px",
-					fontFamily: "monospace",
-					fill: "#F7E9D7",
-					backgroundColor: "#4A3C31",
-					padding: { x: 10, y: 5 },
-					stroke: "#000000",
-					strokeThickness: 2,
-				},
-			)
-			.setOrigin(0.5)
-			.setDepth(150);
+		// Systems
+		this.createParticleEffects();
 
-		this.coordText = this.add
-			.text(10, 10, "Player: x=0, y=0", {
-				fontSize: "14px",
-				fontFamily: "Arial",
-				fill: "#FFFFFF",
-				backgroundColor: "#000000",
-				padding: { x: 5, y: 2 },
-			})
-			.setDepth(150);
-
-		// 4B — Mute toggle button
-		this.createMuteButton();
-
-		// Fade in camera when entering
-		this.cameras.main.fadeIn(800, 0, 0, 0);
+		// 4B — Audio
+		this.initAudio(true);
 	}
 
 	update(time, delta) {

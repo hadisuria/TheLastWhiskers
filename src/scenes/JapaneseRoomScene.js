@@ -23,7 +23,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 	create() {
 		// Initialize state properties
-		this.interactableItems = [];
 		this.activeItem = null;
 		this.showHelpOverlays = false;
 		this.isAlbumOpen = false;
@@ -34,10 +33,14 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.createInteractiveAreas();
 		this.setupPlayer();
 
-		// 4C — Register cat animations (single-frame fallback until real spritesheet added)
+		// 4C — Register cat animations
 		this.createCatAnimations();
 
-		this.setupUI();
+		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const bannerText = isTouch
+			? "Tap screen / D-pad to move • Tap E or items to interact"
+			: "Arrow keys / WASD to move. E to interact. H to toggle help overlays.";
+		this.setupUI(bannerText);
 
 		// Systems
 		this.createParticleEffects();
@@ -49,142 +52,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 	setupRoom() {
 		const roomBg = this.add.image(400, 300, "japanese-room");
 		roomBg.setDisplaySize(800, 600);
-	}
-
-	createBoundaries() {
-		this.boundaries = this.add.group();
-
-		const len = this.roomPolygon.length;
-		for (let i = 0; i < len; i++) {
-			const [x1, y1] = this.roomPolygon[i];
-			const [x2, y2] = this.roomPolygon[(i + 1) % len];
-
-			const centerX = (x1 + x2) / 2;
-			const centerY = (y1 + y2) / 2;
-			const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-			const angle = Math.atan2(y2 - y1, x2 - x1);
-
-			const wall = this.add.rectangle(centerX, centerY, length, 10);
-			wall.setRotation(angle);
-			wall.setFillStyle(this.boundaryColor, 0.3);
-			wall.setAlpha(0); // Invisible by default
-
-			this.boundaries.add(wall);
-		}
-	}
-
-	createInteractiveAreas() {
-		this.roomItemsData.forEach((area) => {
-			const colorNum = Number(area.color);
-			const graphics = this.add.rectangle(
-				area.x,
-				area.y,
-				area.width,
-				area.height,
-				colorNum,
-				0.5,
-			);
-			graphics.setAlpha(0); // Invisible by default
-
-			this.physics.add.existing(graphics, true);
-
-			graphics.name = area.name;
-			graphics.type = area.type || "display";
-			graphics.description = area.description;
-			graphics.color = colorNum;
-
-			const label = this.add
-				.text(area.x, area.y, area.name, {
-					fontSize: "12px",
-					fontFamily: "Arial",
-					color: "#FFFFFF",
-					backgroundColor: "#000000",
-					padding: { x: 3, y: 3 },
-				})
-				.setOrigin(0.5)
-				.setVisible(false); // Invisible by default
-
-			graphics.label = label;
-			this.interactableItems.push(graphics);
-		});
-	}
-
-	setupPlayer() {
-		const [spawnX, spawnY] = this.playerSpawn;
-		// 4C: Use the 'cat' spritesheet key (registered with animations) so anims work.
-		// When cat.png is a single frame, this is visually identical to before.
-		this.player = this.physics.add.sprite(spawnX, spawnY, "cat");
-		this.player.setDisplaySize(40, 40);
-		this.player.body.setSize(30, 30);
-		this.player.body.setCollideWorldBounds(true);
-
-		this.physics.add.collider(this.player, this.interactableItems);
-
-		this.cursors = this.input.keyboard.createCursorKeys();
-		this.wasd = this.input.keyboard.addKeys({
-			up: Phaser.Input.Keyboard.KeyCodes.W,
-			down: Phaser.Input.Keyboard.KeyCodes.S,
-			left: Phaser.Input.Keyboard.KeyCodes.A,
-			right: Phaser.Input.Keyboard.KeyCodes.D,
-		});
-		this.interactKey = this.input.keyboard.addKey("E");
-		this.helpKey = this.input.keyboard.addKey("H");
-
-		// 4A — Touch controls (shows only on touch devices)
-		this.setupTouchControls();
-	}
-
-	setupUI() {
-		this.interactText = this.add
-			.text(400, 530, "", {
-				fontSize: "16px",
-				fontFamily: "monospace",
-				fill: "#F7E9D7",
-				backgroundColor: "#4A3C31",
-				padding: { x: 10, y: 5 },
-				stroke: "#000000",
-				strokeThickness: 2,
-			})
-			.setOrigin(0.5)
-			.setDepth(150);
-		this.interactText.setVisible(false);
-
-		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-		const bannerText = isTouch
-			? "Tap screen / D-pad to move • Tap E or items to interact"
-			: "Arrow keys / WASD to move. E to interact. H to toggle help overlays.";
-
-		this.add
-			.text(
-				400,
-				45,
-				bannerText,
-				{
-					fontSize: "15px",
-					fontFamily: "monospace",
-					fill: "#F7E9D7",
-					backgroundColor: "#4A3C31",
-					padding: { x: 10, y: 5 },
-					stroke: "#000000",
-					strokeThickness: 2,
-				},
-			)
-			.setOrigin(0.5)
-			.setDepth(150);
-
-		this.coordText = this.add.text(10, 10, "Player: x=0, y=0", {
-			fontSize: "14px",
-			fontFamily: "Arial",
-			fill: "#FFFFFF",
-			backgroundColor: "#000000",
-			padding: { x: 5, y: 2 },
-		}).setDepth(150);
-
-		// 4B — Mute toggle button (top-right corner)
-		this.createMuteButton();
-
-		// Fade in camera when starting
-		this.cameras.main.fadeIn(800, 0, 0, 0);
 	}
 
 	update(time, delta) {
