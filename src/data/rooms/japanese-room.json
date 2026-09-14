@@ -66,8 +66,8 @@
       "width": 100,
       "height": 80,
       "name": "sliding door",
-      "type": "gallery-door",
-      "description": "Traditional shoji sliding doors. Press E to enter the Memorial Gallery Room.",
+      "type": "exit-gate",
+      "description": "Traditional shoji sliding doors. Press E to exit the website.",
       "color": "0x00ffff"
     },
     {

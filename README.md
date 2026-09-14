@@ -57,7 +57,7 @@ Explore these objects in the Japanese room (defined as the source of truth in [s
 * **Bookshelf**: A wooden bookshelf filled with scrolls, books, and mementos (opens the photo album).
 * **Bonsai**: A miniature tree representing harmony with nature.
 * **Cabinet**: A wooden cabinet containing traditional tea ceremony utensils.
-* **Sliding Door**: Traditional shoji doors. Stand near them and press `E` to enter the **Memorial Gallery Room**.
+* **Sliding Door**: Traditional shoji doors. Stand near them and press `E` to exit the website via a confirmation modal.
 * **Lantern**: A paper lantern casting a warm, gentle light.
 * **Plant**: A small potted plant adding a touch of green.
 

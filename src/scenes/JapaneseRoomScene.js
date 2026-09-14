@@ -4,6 +4,10 @@ import { openModal } from "../ui/Modal.js";
 import japaneseRoomData from "../data/rooms/japanese-room.json";
 import albumData from "../data/album.json";
 
+// External destination URL when exiting through the sliding shoji gate.
+// Modify this link manually as needed.
+export const EXIT_REDIRECT_URL = "https://example.com";
+
 export default class JapaneseRoomScene extends BaseRoomScene {
 	constructor() {
 		super({ key: "JapaneseRoomScene" });
@@ -26,6 +30,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.activeItem = null;
 		this.showHelpOverlays = false;
 		this.isAlbumOpen = false;
+		this.isExitModalOpen = false;
 
 		// Build scene components
 		this.setupRoom();
@@ -36,7 +41,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		// 4C — Register cat animations
 		this.createCatAnimations();
 
-		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 		const bannerText = isTouch
 			? "Tap screen / D-pad to move • Tap E or items to interact"
 			: "Arrow keys / WASD to move. E to interact. H to toggle help overlays.";
@@ -55,7 +60,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 	}
 
 	update(time, delta) {
-		if (this.isAlbumOpen) {
+		if (this.isAlbumOpen || this.isExitModalOpen) {
 			this.player.body.setVelocity(0);
 			return;
 		}
@@ -90,8 +95,11 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		// Manage proximity feedback
 		if (sortedItems.length > 0 && sortedItems[0].distance < 80) {
 			this.activeItem = sortedItems[0].item;
-			if (this.activeItem.type === "gallery-door") {
-				this.interactText.setText(`Press E to enter the Memorial Gallery`);
+			if (
+				this.activeItem.type === "gallery-door" ||
+				this.activeItem.type === "exit-gate"
+			) {
+				this.interactText.setText(`Press E to exit through the sliding shoji`);
 			} else {
 				this.interactText.setText(
 					`Press E to examine the ${this.activeItem.name}`,
@@ -112,23 +120,12 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 		// 4A: isInteractJustPressed() checks keyboard AND touch interact button
 		if (this.isInteractJustPressed() && this.activeItem) {
-			if (this.activeItem.type === "gallery-door") {
-				// Transition to gallery scene
-				this.player.body.setVelocity(0);
-				this.input.keyboard.enabled = false;
-				// 4B — Stop ambience and birds before leaving
-				if (this.audio) {
-					this.audio.stopAmbience(400);
-					this.audio.stopBirds();
-				}
-				this.cameras.main.fadeOut(800, 0, 0, 0);
-				this.cameras.main.once(
-					Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
-					() => {
-						this.input.keyboard.enabled = true;
-						this.scene.start("GalleryScene");
-					},
-				);
+			if (
+				this.activeItem.type === "gallery-door" ||
+				this.activeItem.type === "exit-gate"
+			) {
+				if (this.audio) this.audio.playInteract();
+				this.openExitConfirmationModal();
 				return;
 			}
 			if (this.activeItem.type === "album-trigger") {
@@ -230,15 +227,15 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			}
 		};
 
-		this.input.on('pointerdown', onPointerDown);
-		this.input.on('pointerup', onPointerUp);
+		this.input.on("pointerdown", onPointerDown);
+		this.input.on("pointerup", onPointerUp);
 
 		openModal(this, {
 			overlayAlpha: 0.8,
 			onClose: () => {
 				this.isAlbumOpen = false;
-				this.input.off('pointerdown', onPointerDown);
-				this.input.off('pointerup', onPointerUp);
+				this.input.off("pointerdown", onPointerDown);
+				this.input.off("pointerup", onPointerUp);
 			},
 			onKeyDown: (event) => {
 				if (
@@ -326,13 +323,15 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 		// Interactive tap zones for turning pages by clicking/tapping left or right page
 		if (pageIndex > 0) {
-			const leftZone = this.add.rectangle(235, 295, 310, 450, 0x000000, 0)
+			const leftZone = this.add
+				.rectangle(235, 295, 310, 450, 0x000000, 0)
 				.setInteractive({ useHandCursor: true })
 				.on("pointerdown", () => this.flipPage(-1));
 			this.albumPageContentContainer.add(leftZone);
 		}
 		if (pageIndex < this.albumPagesData.length - 1) {
-			const rightZone = this.add.rectangle(565, 295, 310, 450, 0x000000, 0)
+			const rightZone = this.add
+				.rectangle(565, 295, 310, 450, 0x000000, 0)
 				.setInteractive({ useHandCursor: true })
 				.on("pointerdown", () => this.flipPage(1));
 			this.albumPageContentContainer.add(rightZone);
@@ -505,22 +504,17 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		}
 
 		// Bottom Close Help Tip
-		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+		const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 		const promptStr = isTouch
 			? "Tap outside or ESC to Close • Tap pages, ◀ ▶ or Swipe to turn pages"
 			: "Click outside or Press E / ESC to Close • Use A/D or Left/Right arrows to turn pages";
 
 		const closePrompt = this.add
-			.text(
-				400,
-				560,
-				promptStr,
-				{
-					fontSize: "12px",
-					fontFamily: "monospace",
-					color: "#b5a89e",
-				},
-			)
+			.text(400, 560, promptStr, {
+				fontSize: "12px",
+				fontFamily: "monospace",
+				color: "#b5a89e",
+			})
 			.setOrigin(0.5);
 		this.albumPageContentContainer.add(closePrompt);
 	}
@@ -632,6 +626,173 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			});
 		} else if (item.name === "bonsai") {
 			this.createBonsaiLeafDrop();
+		}
+	}
+
+	openExitConfirmationModal() {
+		this.isExitModalOpen = true;
+
+		openModal(this, {
+			overlayAlpha: 0.8,
+			closeOnOverlayClick: false,
+			closeOnEOrEscKey: false,
+			onClose: () => {
+				this.isExitModalOpen = false;
+				this.moveTarget = null;
+				this.pendingItemInteraction = null;
+			},
+			onKeyDown: (event, closeModal) => {
+				if (event.key === "Escape" || event.key === "c" || event.key === "C") {
+					this.moveTarget = null;
+					this.pendingItemInteraction = null;
+					if (this.audio) this.audio.playInteract();
+					closeModal();
+				} else if (
+					event.key === "Enter" ||
+					event.key === "y" ||
+					event.key === "Y"
+				) {
+					this.moveTarget = null;
+					this.pendingItemInteraction = null;
+					this.confirmExit();
+				}
+			},
+			buildContent: (container, closeModal) => {
+				// Drop shadow
+				const modalBg = this.add.graphics();
+				modalBg.fillStyle(0x000000, 0.5);
+				modalBg.fillRoundedRect(175, 165, 450, 270, 16);
+
+				// Dark leather wood base
+				modalBg.fillStyle(0x2d1a12, 1);
+				modalBg.fillRoundedRect(170, 160, 460, 270, 14);
+
+				// Gold trim border
+				modalBg.lineStyle(3, 0xd4af37, 1);
+				modalBg.strokeRoundedRect(170, 160, 460, 270, 14);
+
+				// Inner dark panel
+				modalBg.fillStyle(0x1e1410, 1);
+				modalBg.fillRoundedRect(180, 170, 440, 250, 10);
+				container.add(modalBg);
+
+				// Title
+				const titleText = this.add
+					.text(400, 205, "🚪 Exit Website", {
+						fontSize: "22px",
+						fontFamily: "Playfair Display",
+						color: "#F7E9D7",
+						fontStyle: "bold",
+						stroke: "#000000",
+						strokeThickness: 2,
+					})
+					.setOrigin(0.5);
+				container.add(titleText);
+
+				// Message Body
+				const messageText = this.add
+					.text(
+						400,
+						280,
+						"Are you sure you want to exit through the sliding shoji?",
+						{
+							fontSize: "15px",
+							fontFamily: "Outfit, sans-serif",
+							color: "#E0D6C5",
+							align: "center",
+							wordWrap: { width: 400 },
+							lineSpacing: 6,
+						},
+					)
+					.setOrigin(0.5);
+				container.add(messageText);
+
+				// Cancel Button graphics
+				const cancelBtnBg = this.add.graphics();
+				const drawCancelBtn = (isHover) => {
+					cancelBtnBg.clear();
+					cancelBtnBg.fillStyle(isHover ? 0x5d4c3e : 0x4a3c31, 1);
+					cancelBtnBg.fillRoundedRect(220, 345, 140, 44, 8);
+					cancelBtnBg.lineStyle(2, 0x8d6e63, 1);
+					cancelBtnBg.strokeRoundedRect(220, 345, 140, 44, 8);
+				};
+				drawCancelBtn(false);
+				container.add(cancelBtnBg);
+
+				const cancelText = this.add
+					.text(290, 367, "Cancel", {
+						fontSize: "16px",
+						fontFamily: "Outfit, sans-serif",
+						color: "#F7E9D7",
+						fontStyle: "bold",
+					})
+					.setOrigin(0.5);
+				container.add(cancelText);
+
+				const cancelZone = this.add
+					.rectangle(290, 367, 140, 44, 0x000000, 0)
+					.setInteractive({ useHandCursor: true })
+					.on("pointerover", () => drawCancelBtn(true))
+					.on("pointerout", () => drawCancelBtn(false))
+					.on("pointerdown", (pointer, localX, localY, event) => {
+						if (event && event.stopPropagation) event.stopPropagation();
+						this.moveTarget = null;
+						this.pendingItemInteraction = null;
+						if (this.audio) this.audio.playInteract();
+						closeModal();
+					});
+				container.add(cancelZone);
+
+				// Exit Button graphics
+				const exitBtnBg = this.add.graphics();
+				const drawExitBtn = (isHover) => {
+					exitBtnBg.clear();
+					exitBtnBg.fillStyle(isHover ? 0xf28f73 : 0xe07a5f, 1);
+					exitBtnBg.fillRoundedRect(440, 345, 140, 44, 8);
+					exitBtnBg.lineStyle(2, 0xffb499, 1);
+					exitBtnBg.strokeRoundedRect(440, 345, 140, 44, 8);
+				};
+				drawExitBtn(false);
+				container.add(exitBtnBg);
+
+				const exitText = this.add
+					.text(510, 367, "Exit Site", {
+						fontSize: "16px",
+						fontFamily: "Outfit, sans-serif",
+						color: "#FFFFFF",
+						fontStyle: "bold",
+					})
+					.setOrigin(0.5);
+				container.add(exitText);
+
+				const exitZone = this.add
+					.rectangle(510, 367, 140, 44, 0x000000, 0)
+					.setInteractive({ useHandCursor: true })
+					.on("pointerover", () => drawExitBtn(true))
+					.on("pointerout", () => drawExitBtn(false))
+					.on("pointerdown", (pointer, localX, localY, event) => {
+						if (event && event.stopPropagation) event.stopPropagation();
+						this.moveTarget = null;
+						this.pendingItemInteraction = null;
+						this.confirmExit();
+					});
+				container.add(exitZone);
+			},
+		});
+	}
+
+	confirmExit() {
+		if (this.audio) this.audio.playInteract();
+
+		// Handle redirection (works whether in iframe or main window)
+		try {
+			if (window.top && window.top !== window) {
+				window.top.location.href = EXIT_REDIRECT_URL;
+			} else {
+				window.location.href = EXIT_REDIRECT_URL;
+			}
+		} catch (e) {
+			window.location.href = EXIT_REDIRECT_URL;
 		}
 	}
 }

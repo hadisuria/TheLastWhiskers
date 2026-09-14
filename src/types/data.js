@@ -5,7 +5,7 @@
  * @property {number} width - Area width
  * @property {number} height - Area height
  * @property {string} name - Display name / label
- * @property {"display" | "gallery-door" | "album-trigger" | "room-exit" | "photo-display"} type - Item behavior category
+ * @property {"display" | "gallery-door" | "exit-gate" | "album-trigger" | "room-exit" | "photo-display"} type - Item behavior category
  * @property {string} description - Interactive text description
  * @property {string} color - Hex string color format (e.g. "0xff0000")
  * @property {string} [photoKey] - Image texture key for gallery photo zoom
