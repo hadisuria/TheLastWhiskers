@@ -8,6 +8,8 @@ import Phaser from "phaser";
 export function openModal(scene, options = {}) {
 	const {
 		overlayAlpha = 0.8,
+		closeOnOverlayClick = true,
+		closeOnEOrEscKey = true,
 		buildContent,
 		onKeyDown,
 		onClose,
@@ -67,11 +69,15 @@ export function openModal(scene, options = {}) {
 		scene.events.once(Phaser.Scenes.Events.SLEEP, handleSceneExit);
 	}
 
-	// Semi-transparent click-to-close overlay
+	// Semi-transparent backdrop overlay
 	const overlay = scene.add
 		.rectangle(400, 300, 800, 600, 0x000000, overlayAlpha)
-		.setInteractive()
-		.on("pointerdown", () => closeModal());
+		.setInteractive();
+
+	if (closeOnOverlayClick) {
+		overlay.on("pointerdown", () => closeModal());
+	}
+
 	container.add(overlay);
 
 	// Custom content population
@@ -92,7 +98,7 @@ export function openModal(scene, options = {}) {
 
 	// Keydown listener
 	const keyListener = (event) => {
-		if (event.key === "e" || event.key === "E" || event.key === "Escape") {
+		if (closeOnEOrEscKey && (event.key === "e" || event.key === "E" || event.key === "Escape")) {
 			closeModal();
 			return;
 		}

@@ -370,8 +370,11 @@ export default class BaseRoomScene extends Phaser.Scene {
 		this.touchControls = new TouchControls(this, 150);
 
 		// Pointer listener for tap-to-move on mobile/touch & desktop click
-		this.input.on('pointerdown', (pointer) => {
-			if (this.isAlbumOpen || this.isZoomed) return;
+		this.input.on('pointerdown', (pointer, currentlyOver) => {
+			if (this.isAlbumOpen || this.isZoomed || this.isExitModalOpen) return;
+
+			// Don't set move target if tapping any interactive UI element (modal buttons, mute button, etc.)
+			if (currentlyOver && currentlyOver.length > 0) return;
 
 			// Don't set move target if tapping top-right mute button
 			if (this._muteButton && this._muteButton.getBounds().contains(pointer.x, pointer.y)) {
