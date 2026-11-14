@@ -1,12 +1,12 @@
 import Phaser from "phaser";
 import BaseRoomScene from "./BaseRoomScene.js";
 import { openModal } from "../ui/Modal.js";
+import { CONFIG } from "../config.js";
 import japaneseRoomData from "../data/rooms/japanese-room.json";
 import albumData from "../data/album.json";
 
 // External destination URL when exiting through the sliding shoji gate.
-// Modify this link manually as needed.
-export const EXIT_REDIRECT_URL = "https://example.com";
+export const EXIT_REDIRECT_URL = CONFIG.navigation.exitRedirectUrl;
 
 export default class JapaneseRoomScene extends BaseRoomScene {
 	constructor() {
@@ -19,14 +19,9 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.playerSpawn = japaneseRoomData.playerSpawn;
 		this.boundaryColor = Number(japaneseRoomData.boundaryColor || "0xff0000");
 		this.roomItemsData = japaneseRoomData.items;
-		this.flipOnLeft = false;
 	}
 
-	// preload() is intentionally omitted — all assets are loaded by PreloadScene
-	// (Phase 4D). Adding new assets: add them to PreloadScene.preload() instead.
-
 	create() {
-		// Initialize state properties
 		this.activeItem = null;
 		this.showHelpOverlays = false;
 		this.isAlbumOpen = false;
@@ -36,36 +31,46 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.setupRoom();
 		this.createBoundaries();
 		this.createInteractiveAreas();
-		this.setupPlayer();
 
-		// 4C — Register cat animations
-		this.createCatAnimations();
+		// Particle systems (dust, lantern, steam, leaves)
+		this.createParticleEffects();
+
+		// Setup player entity & colliders
+		this.setupPlayer();
 
 		const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 		const bannerText = isTouch
 			? "Tap screen / D-pad to move • Tap E or items to interact"
-			: "Arrow keys / WASD to move. E to interact. H to toggle help overlays.";
+			: "WASD / Arrows to move • Shift to sprint • E to interact • H for help";
 		this.setupUI(bannerText);
 
-		// Systems
-		this.createParticleEffects();
-
-		// 4B — Audio (after scene is set up)
+		// Audio
 		this.initAudio(true);
 	}
 
 	setupRoom() {
+		const bg = this.add.graphics();
+		bg.fillStyle(0x18110c, 1);
+		bg.fillRect(0, 0, 800, 600);
+		bg.fillStyle(0x2a1c13, 0.45);
+		bg.fillEllipse(400, 320, 740, 520);
+
 		const roomBg = this.add.image(400, 300, "japanese-room");
 		roomBg.setDisplaySize(800, 600);
 	}
 
 	update(time, delta) {
 		if (this.isAlbumOpen || this.isExitModalOpen) {
-			this.player.body.setVelocity(0);
+			if (this.interactKey) Phaser.Input.Keyboard.JustDown(this.interactKey);
+			this.tapInteractRequested = false;
+			if (this.player && this.player.body) {
+				this.player.body.setVelocity(0);
+				this.player.body.setAcceleration(0, 0);
+			}
 			return;
 		}
 
-		this.handlePlayerMovement();
+		this.handlePlayerMovement(time, delta);
 		this.handlePlayerBoundaries(delta);
 		this.updateCoordinatesDisplay();
 		this.handleItemInteractions();
@@ -76,70 +81,21 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		}
 	}
 
-	handleItemInteractions() {
-		this.activeItem = null;
-		this.interactText.setVisible(false);
-
-		const sortedItems = this.interactableItems
-			.map((item) => {
-				const distance = Phaser.Math.Distance.Between(
-					this.player.x,
-					this.player.y,
-					item.x,
-					item.y,
-				);
-				return { item, distance };
-			})
-			.sort((a, b) => a.distance - b.distance);
-
-		// Manage proximity feedback
-		if (sortedItems.length > 0 && sortedItems[0].distance < 80) {
-			this.activeItem = sortedItems[0].item;
-			if (
-				this.activeItem.type === "gallery-door" ||
-				this.activeItem.type === "exit-gate"
-			) {
-				this.interactText.setText(`Press E to exit through the sliding shoji`);
-			} else {
-				this.interactText.setText(
-					`Press E to examine the ${this.activeItem.name}`,
-				);
-			}
-			this.interactText.setVisible(true);
-
-			if (this.showHelpOverlays) {
-				this.interactableItems.forEach((item) => {
-					item.setAlpha(item === this.activeItem ? 0.4 : 0.2);
-				});
-			}
-		} else if (this.showHelpOverlays) {
-			this.interactableItems.forEach((item) => {
-				item.setAlpha(0.2);
-			});
-		}
-
-		// 4A: isInteractJustPressed() checks keyboard AND touch interact button
-		if (this.isInteractJustPressed() && this.activeItem) {
-			if (
-				this.activeItem.type === "gallery-door" ||
-				this.activeItem.type === "exit-gate"
-			) {
-				if (this.audio) this.audio.playInteract();
-				this.openExitConfirmationModal();
-				return;
-			}
-			if (this.activeItem.type === "album-trigger") {
-				// 4B — Interact chime
-				if (this.audio) this.audio.playInteract();
-				this.openPhotoAlbum();
-				return;
-			}
-
-			// 4B — Interact chime for display items
+	onItemInteract(item) {
+		if (item.type === "gallery-door" || item.type === "exit-gate") {
 			if (this.audio) this.audio.playInteract();
-			this.showItemDescription(this.activeItem);
-			this.triggerItemEffect(this.activeItem);
+			this.openDoorActionModal();
+			return;
 		}
+		if (item.type === "album-trigger") {
+			if (this.audio) this.audio.playInteract();
+			this.openPhotoAlbum();
+			return;
+		}
+
+		if (this.audio) this.audio.playInteract();
+		this.showItemDescription(item);
+		this.triggerItemEffect(item);
 	}
 
 	showItemDescription(item) {
@@ -152,13 +108,13 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 		const description = this.add
 			.text(400, 350, item.description, {
-				fontSize: "18px",
-				fontFamily: "monospace",
+				fontSize: "16px",
+				fontFamily: "Outfit, monospace",
 				fill: "#F7E9D7",
-				backgroundColor: "#4A3C31",
+				backgroundColor: "#3a2a1e",
 				padding: { x: 15, y: 10 },
 				wordWrap: { width: 500 },
-				stroke: "#000000",
+				stroke: "#1a0f08",
 				strokeThickness: 2,
 			})
 			.setOrigin(0.5)
@@ -203,6 +159,10 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		this.activeDescription = description;
 	}
 
+	// ---------------------------------------------------------------------------
+	// Photo Album
+	// ---------------------------------------------------------------------------
+
 	openPhotoAlbum() {
 		this.isAlbumOpen = true;
 		this.albumCurrentPage = 0;
@@ -232,6 +192,9 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 		openModal(this, {
 			overlayAlpha: 0.8,
+			onCloseStart: () => {
+				this.isAlbumOpen = false;
+			},
 			onClose: () => {
 				this.isAlbumOpen = false;
 				this.input.off("pointerdown", onPointerDown);
@@ -255,60 +218,44 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			buildContent: (container) => {
 				this.albumContainer = container;
 
-				// Book cover/base graphics
 				const bookBg = this.add.graphics();
-
-				// 1. Draw shadow
 				bookBg.fillStyle(0x000000, 0.4);
 				bookBg.fillRoundedRect(65, 55, 670, 480, 16);
 
-				// 2. Draw outer cover (dark leather wood)
 				bookBg.fillStyle(0x2d1a12, 1);
 				bookBg.fillRoundedRect(60, 50, 680, 490, 12);
 
-				// 3. Gold outline trim on cover
 				bookBg.lineStyle(4, 0xd4af37, 1);
 				bookBg.strokeRoundedRect(68, 58, 664, 474, 8);
 
-				// 4. Left page base
 				bookBg.fillStyle(0xfaf6ec, 1);
 				bookBg.fillRoundedRect(80, 70, 310, 450, 6);
 
-				// 5. Right page base
 				bookBg.fillStyle(0xfaf6ec, 1);
 				bookBg.fillRoundedRect(410, 70, 310, 450, 6);
 
-				// 6. Center binding fold shadows
 				bookBg.fillStyle(0x000000, 0.12);
 				bookBg.fillRect(380, 70, 10, 450);
 				bookBg.fillRect(410, 70, 10, 450);
 
-				// 7. Spine crease line
 				bookBg.fillStyle(0x130a07, 1);
 				bookBg.fillRect(397, 60, 6, 470);
 
 				container.add(bookBg);
 
-				// Nested container to hold the page elements that change
 				this.albumPageContentContainer = this.add.container(0, 0);
 				container.add(this.albumPageContentContainer);
 
-				// Read pages data from imported album.json
 				this.albumPagesData = albumData;
-
-				// Render the first page
 				this.renderAlbumPage(this.albumCurrentPage);
 			},
 		});
 	}
 
 	renderAlbumPage(pageIndex) {
-		// Clear old page contents
 		this.albumPageContentContainer.removeAll(true);
-
 		const page = this.albumPagesData[pageIndex];
 
-		// 1. Album Title / Header
 		const headerText = this.add
 			.text(400, 32, "🐾 Photo Album 🐾", {
 				fontSize: "18px",
@@ -321,7 +268,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			.setOrigin(0.5);
 		this.albumPageContentContainer.add(headerText);
 
-		// Interactive tap zones for turning pages by clicking/tapping left or right page
 		if (pageIndex > 0) {
 			const leftZone = this.add
 				.rectangle(235, 295, 310, 450, 0x000000, 0)
@@ -337,115 +283,75 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			this.albumPageContentContainer.add(rightZone);
 		}
 
-		// --- LEFT PAGE CONTENT ---
-		// Polaroid Frame (rotated slightly counter-clockwise)
-		const leftPolaroid = this.add.graphics();
-		leftPolaroid.fillStyle(0xffffff, 1);
-		leftPolaroid.fillRoundedRect(110, 95, 250, 260, 4);
-		leftPolaroid.lineStyle(1, 0xe0d6c5, 1);
-		leftPolaroid.strokeRoundedRect(110, 95, 250, 260, 4);
-		leftPolaroid.setRotation(-0.02);
-		this.albumPageContentContainer.add(leftPolaroid);
+		// Render Left & Right Polaroids (border drawn behind photo so natural overhang isn't crossed by lines)
+		const sides = [
+			{
+				data: page.left,
+				centerX: 235,
+				polaroidX: 110,
+				borderX: 125,
+				rot: -0.02,
+				tapeRot: -0.05,
+			},
+			{
+				data: page.right,
+				centerX: 565,
+				polaroidX: 440,
+				borderX: 455,
+				rot: 0.02,
+				tapeRot: 0.05,
+			},
+		];
 
-		// Tape effect
-		const leftTape = this.add
-			.rectangle(235, 95, 55, 16, 0xddccbb, 0.45)
-			.setRotation(-0.05);
-		this.albumPageContentContainer.add(leftTape);
+		for (const side of sides) {
+			const polaroid = this.add.graphics();
+			polaroid.fillStyle(0xffffff, 1);
+			polaroid.fillRoundedRect(side.polaroidX, 95, 250, 260, 4);
+			polaroid.lineStyle(1, 0xe0d6c5, 1);
+			polaroid.strokeRoundedRect(side.polaroidX, 95, 250, 260, 4);
+			polaroid.setRotation(side.rot);
+			this.albumPageContentContainer.add(polaroid);
 
-		// Left Image
-		const leftImage = this.add.image(235, 210, page.left.key);
-		leftImage.setDisplaySize(220, 170);
-		leftImage.setRotation(-0.02);
-		this.albumPageContentContainer.add(leftImage);
+			const tape = this.add
+				.rectangle(side.centerX, 95, 55, 16, 0xddccbb, 0.45)
+				.setRotation(side.tapeRot);
+			this.albumPageContentContainer.add(tape);
 
-		// Inner thin border for picture mounting look
-		const leftImgBorder = this.add.graphics();
-		leftImgBorder.lineStyle(1.5, 0x888070, 0.7);
-		leftImgBorder.strokeRect(125, 125, 220, 170);
-		leftImgBorder.setRotation(-0.02);
-		this.albumPageContentContainer.add(leftImgBorder);
+			const imgBorder = this.add.graphics();
+			imgBorder.lineStyle(1.5, 0x888070, 0.7);
+			imgBorder.strokeRect(side.borderX, 125, 220, 170);
+			imgBorder.setRotation(side.rot);
+			this.albumPageContentContainer.add(imgBorder);
 
-		// Left Polaroid Title (handwritten font style)
-		const leftTitle = this.add
-			.text(235, 320, page.left.title, {
-				fontSize: "15px",
-				fontFamily: "Playfair Display",
-				color: "#3e2723",
-				fontStyle: "bold italic",
-			})
-			.setOrigin(0.5)
-			.setRotation(-0.02);
-		this.albumPageContentContainer.add(leftTitle);
+			const image = this.add.image(side.centerX, 210, side.data.key);
+			image.setDisplaySize(220, 170);
+			image.setRotation(side.rot);
+			this.albumPageContentContainer.add(image);
 
-		// Left Page Description (handwritten note look)
-		const leftDesc = this.add
-			.text(235, 410, page.left.desc, {
-				fontSize: "13px",
-				fontFamily: "monospace",
-				color: "#5d4037",
-				wordWrap: { width: 250 },
-				align: "center",
-				lineSpacing: 3,
-			})
-			.setOrigin(0.5);
-		this.albumPageContentContainer.add(leftDesc);
+			const title = this.add
+				.text(side.centerX, 320, side.data.title, {
+					fontSize: "15px",
+					fontFamily: "Playfair Display",
+					color: "#3e2723",
+					fontStyle: "bold italic",
+				})
+				.setOrigin(0.5)
+				.setRotation(side.rot);
+			this.albumPageContentContainer.add(title);
 
-		// --- RIGHT PAGE CONTENT ---
-		// Polaroid Frame (rotated slightly clockwise)
-		const rightPolaroid = this.add.graphics();
-		rightPolaroid.fillStyle(0xffffff, 1);
-		rightPolaroid.fillRoundedRect(440, 95, 250, 260, 4);
-		rightPolaroid.lineStyle(1, 0xe0d6c5, 1);
-		rightPolaroid.strokeRoundedRect(440, 95, 250, 260, 4);
-		rightPolaroid.setRotation(0.02);
-		this.albumPageContentContainer.add(rightPolaroid);
+			const desc = this.add
+				.text(side.centerX, 410, side.data.desc, {
+					fontSize: "13px",
+					fontFamily: "monospace",
+					color: "#5d4037",
+					wordWrap: { width: 250 },
+					align: "center",
+					lineSpacing: 3,
+				})
+				.setOrigin(0.5);
+			this.albumPageContentContainer.add(desc);
+		}
 
-		// Tape effect
-		const rightTape = this.add
-			.rectangle(565, 95, 55, 16, 0xddccbb, 0.45)
-			.setRotation(0.05);
-		this.albumPageContentContainer.add(rightTape);
-
-		// Right Image
-		const rightImage = this.add.image(565, 210, page.right.key);
-		rightImage.setDisplaySize(220, 170);
-		rightImage.setRotation(0.02);
-		this.albumPageContentContainer.add(rightImage);
-
-		// Inner thin border for picture mounting look
-		const rightImgBorder = this.add.graphics();
-		rightImgBorder.lineStyle(1.5, 0x888070, 0.7);
-		rightImgBorder.strokeRect(455, 125, 220, 170);
-		rightImgBorder.setRotation(0.02);
-		this.albumPageContentContainer.add(rightImgBorder);
-
-		// Right Polaroid Title
-		const rightTitle = this.add
-			.text(565, 320, page.right.title, {
-				fontSize: "15px",
-				fontFamily: "Playfair Display",
-				color: "#3e2723",
-				fontStyle: "bold italic",
-			})
-			.setOrigin(0.5)
-			.setRotation(0.02);
-		this.albumPageContentContainer.add(rightTitle);
-
-		// Right Page Description
-		const rightDesc = this.add
-			.text(565, 410, page.right.desc, {
-				fontSize: "13px",
-				fontFamily: "monospace",
-				color: "#5d4037",
-				wordWrap: { width: 250 },
-				align: "center",
-				lineSpacing: 3,
-			})
-			.setOrigin(0.5);
-		this.albumPageContentContainer.add(rightDesc);
-
-		// --- NAVIGATION ELEMENTS ---
 		// Page Numbers
 		const leftPageNum = this.add
 			.text(95, 500, (pageIndex * 2 + 1).toString(), {
@@ -465,7 +371,7 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			.setOrigin(0.5);
 		this.albumPageContentContainer.add(rightPageNum);
 
-		// Previous Page Arrow Button
+		// Page Buttons
 		if (pageIndex > 0) {
 			const prevBtn = this.add
 				.text(35, 290, "◀", {
@@ -484,7 +390,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			this.albumPageContentContainer.add(prevBtn);
 		}
 
-		// Next Page Arrow Button
 		if (pageIndex < this.albumPagesData.length - 1) {
 			const nextBtn = this.add
 				.text(765, 290, "▶", {
@@ -503,7 +408,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			this.albumPageContentContainer.add(nextBtn);
 		}
 
-		// Bottom Close Help Tip
 		const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
 		const promptStr = isTouch
 			? "Tap outside or ESC to Close • Tap pages, ◀ ▶ or Swipe to turn pages"
@@ -524,7 +428,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		if (nextPageIndex < 0 || nextPageIndex >= this.albumPagesData.length)
 			return;
 
-		// 4B — Page turn sound
 		if (this.audio) this.audio.playPageTurn();
 
 		this.tweens.add({
@@ -542,6 +445,10 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			},
 		});
 	}
+
+	// ---------------------------------------------------------------------------
+	// Particle Emitters
+	// ---------------------------------------------------------------------------
 
 	createParticleEffects() {
 		super.createParticleEffects();
@@ -596,8 +503,8 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 			scale: { start: 0.2, end: 0.1 },
 			rotate: { min: 0, max: 360 },
 			lifespan: 1200,
-			tint: 0x557a46, // Green bonsai leaf color
-			frequency: -1, // Emit manually
+			tint: 0x557a46,
+			frequency: -1,
 		});
 	}
 
@@ -609,7 +516,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 
 	triggerItemEffect(item) {
 		if (item.name === "lantern") {
-			// Glow lighter / lighter burst effect for a period of time
 			this.lanternEmitter.setQuantity(5);
 			this.lanternEmitter.setScale({ start: 1, end: 0.2 });
 			this.time.delayedCall(1000, () => {
@@ -617,7 +523,6 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 				this.lanternEmitter.setScale({ start: 0.6, end: 0.1 });
 			});
 		} else if (item.name === "teapot") {
-			// Teapot shows more smoke/steam on examine
 			this.steamEmitter.setQuantity(6);
 			this.steamEmitter.setSpeed({ min: 10, max: 40 });
 			this.time.delayedCall(2000, () => {
@@ -629,58 +534,57 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 		}
 	}
 
-	openExitConfirmationModal() {
+	// ---------------------------------------------------------------------------
+	// Sliding Shoji Door Modal & Room Transition
+	// ---------------------------------------------------------------------------
+
+	openDoorActionModal() {
 		this.isExitModalOpen = true;
 
 		openModal(this, {
 			overlayAlpha: 0.8,
-			closeOnOverlayClick: false,
-			closeOnEOrEscKey: false,
+			closeOnOverlayClick: true,
+			closeOnEOrEscKey: true,
+			onCloseStart: () => {
+				this.isExitModalOpen = false;
+				this.moveTarget = null;
+				this.pendingItemInteraction = null;
+			},
 			onClose: () => {
 				this.isExitModalOpen = false;
 				this.moveTarget = null;
 				this.pendingItemInteraction = null;
 			},
 			onKeyDown: (event, closeModal) => {
-				if (event.key === "Escape" || event.key === "c" || event.key === "C") {
-					this.moveTarget = null;
-					this.pendingItemInteraction = null;
-					if (this.audio) this.audio.playInteract();
+				if (event.key === "c" || event.key === "C") {
+					if (this.audio) this.audio.playUIClick();
 					closeModal();
-				} else if (
-					event.key === "Enter" ||
-					event.key === "y" ||
-					event.key === "Y"
-				) {
-					this.moveTarget = null;
-					this.pendingItemInteraction = null;
+				} else if (event.key === "1" || event.key === "g" || event.key === "G" || event.key === "Enter") {
+					closeModal();
+					this.transitionToGallery();
+				} else if (event.key === "2" || event.key === "x" || event.key === "X") {
 					this.confirmExit();
 				}
 			},
 			buildContent: (container, closeModal) => {
-				// Drop shadow
 				const modalBg = this.add.graphics();
-				modalBg.fillStyle(0x000000, 0.5);
-				modalBg.fillRoundedRect(175, 165, 450, 270, 16);
+				modalBg.fillStyle(0x000000, 0.55);
+				modalBg.fillRoundedRect(165, 140, 470, 310, 16);
 
-				// Dark leather wood base
 				modalBg.fillStyle(0x2d1a12, 1);
-				modalBg.fillRoundedRect(170, 160, 460, 270, 14);
+				modalBg.fillRoundedRect(160, 135, 480, 310, 14);
 
-				// Gold trim border
 				modalBg.lineStyle(3, 0xd4af37, 1);
-				modalBg.strokeRoundedRect(170, 160, 460, 270, 14);
+				modalBg.strokeRoundedRect(160, 135, 480, 310, 14);
 
-				// Inner dark panel
 				modalBg.fillStyle(0x1e1410, 1);
-				modalBg.fillRoundedRect(180, 170, 440, 250, 10);
+				modalBg.fillRoundedRect(170, 145, 460, 290, 10);
 				container.add(modalBg);
 
-				// Title
 				const titleText = this.add
-					.text(400, 205, "🚪 Exit Website", {
+					.text(400, 180, "🚪 Sliding Shoji Doors", {
 						fontSize: "22px",
-						fontFamily: "Playfair Display",
+						fontFamily: "Playfair Display, serif",
 						color: "#F7E9D7",
 						fontStyle: "bold",
 						stroke: "#000000",
@@ -689,75 +593,65 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 					.setOrigin(0.5);
 				container.add(titleText);
 
-				// Message Body
 				const messageText = this.add
-					.text(
-						400,
-						280,
-						"Are you sure you want to exit through the sliding shoji?",
-						{
-							fontSize: "15px",
-							fontFamily: "Outfit, sans-serif",
-							color: "#E0D6C5",
-							align: "center",
-							wordWrap: { width: 400 },
-							lineSpacing: 6,
-						},
-					)
+					.text(400, 218, "Where would you like to go?", {
+						fontSize: "14px",
+						fontFamily: "Outfit, sans-serif",
+						color: "#C2A880",
+						align: "center",
+					})
 					.setOrigin(0.5);
 				container.add(messageText);
 
-				// Cancel Button graphics
-				const cancelBtnBg = this.add.graphics();
-				const drawCancelBtn = (isHover) => {
-					cancelBtnBg.clear();
-					cancelBtnBg.fillStyle(isHover ? 0x5d4c3e : 0x4a3c31, 1);
-					cancelBtnBg.fillRoundedRect(220, 345, 140, 44, 8);
-					cancelBtnBg.lineStyle(2, 0x8d6e63, 1);
-					cancelBtnBg.strokeRoundedRect(220, 345, 140, 44, 8);
+				// Button 1: Enter Memorial Photo Gallery
+				const galleryBtnBg = this.add.graphics();
+				const drawGalleryBtn = (isHover) => {
+					galleryBtnBg.clear();
+					galleryBtnBg.fillStyle(isHover ? 0xe9c46a : 0xd4af37, 1);
+					galleryBtnBg.fillRoundedRect(200, 250, 400, 46, 8);
+					galleryBtnBg.lineStyle(2, 0xfff0aa, 1);
+					galleryBtnBg.strokeRoundedRect(200, 250, 400, 46, 8);
 				};
-				drawCancelBtn(false);
-				container.add(cancelBtnBg);
+				drawGalleryBtn(false);
+				container.add(galleryBtnBg);
 
-				const cancelText = this.add
-					.text(290, 367, "Cancel", {
-						fontSize: "16px",
+				const galleryText = this.add
+					.text(400, 273, "🖼️  Enter Memorial Photo Gallery (1 / Enter)", {
+						fontSize: "14px",
 						fontFamily: "Outfit, sans-serif",
-						color: "#F7E9D7",
+						color: "#1f140e",
 						fontStyle: "bold",
 					})
 					.setOrigin(0.5);
-				container.add(cancelText);
+				container.add(galleryText);
 
-				const cancelZone = this.add
-					.rectangle(290, 367, 140, 44, 0x000000, 0)
+				const galleryZone = this.add
+					.rectangle(400, 273, 400, 46, 0x000000, 0)
 					.setInteractive({ useHandCursor: true })
-					.on("pointerover", () => drawCancelBtn(true))
-					.on("pointerout", () => drawCancelBtn(false))
+					.on("pointerover", () => drawGalleryBtn(true))
+					.on("pointerout", () => drawGalleryBtn(false))
 					.on("pointerdown", (pointer, localX, localY, event) => {
 						if (event && event.stopPropagation) event.stopPropagation();
-						this.moveTarget = null;
-						this.pendingItemInteraction = null;
-						if (this.audio) this.audio.playInteract();
 						closeModal();
+						this.transitionToGallery();
 					});
-				container.add(cancelZone);
+				container.add(galleryZone);
 
-				// Exit Button graphics
+				// Button 2: Exit Website (placeholder redirect to external web)
 				const exitBtnBg = this.add.graphics();
 				const drawExitBtn = (isHover) => {
 					exitBtnBg.clear();
 					exitBtnBg.fillStyle(isHover ? 0xf28f73 : 0xe07a5f, 1);
-					exitBtnBg.fillRoundedRect(440, 345, 140, 44, 8);
+					exitBtnBg.fillRoundedRect(200, 310, 400, 44, 8);
 					exitBtnBg.lineStyle(2, 0xffb499, 1);
-					exitBtnBg.strokeRoundedRect(440, 345, 140, 44, 8);
+					exitBtnBg.strokeRoundedRect(200, 310, 400, 44, 8);
 				};
 				drawExitBtn(false);
 				container.add(exitBtnBg);
 
 				const exitText = this.add
-					.text(510, 367, "Exit Site", {
-						fontSize: "16px",
+					.text(400, 332, "🌐  Exit Website (2)", {
+						fontSize: "14px",
 						fontFamily: "Outfit, sans-serif",
 						color: "#FFFFFF",
 						fontStyle: "bold",
@@ -766,25 +660,78 @@ export default class JapaneseRoomScene extends BaseRoomScene {
 				container.add(exitText);
 
 				const exitZone = this.add
-					.rectangle(510, 367, 140, 44, 0x000000, 0)
+					.rectangle(400, 332, 400, 44, 0x000000, 0)
 					.setInteractive({ useHandCursor: true })
 					.on("pointerover", () => drawExitBtn(true))
 					.on("pointerout", () => drawExitBtn(false))
 					.on("pointerdown", (pointer, localX, localY, event) => {
 						if (event && event.stopPropagation) event.stopPropagation();
-						this.moveTarget = null;
-						this.pendingItemInteraction = null;
 						this.confirmExit();
 					});
 				container.add(exitZone);
+
+				// Button 3: Stay Here / Cancel
+				const cancelBtnBg = this.add.graphics();
+				const drawCancelBtn = (isHover) => {
+					cancelBtnBg.clear();
+					cancelBtnBg.fillStyle(isHover ? 0x5d4c3e : 0x4a3c31, 1);
+					cancelBtnBg.fillRoundedRect(280, 370, 240, 38, 8);
+					cancelBtnBg.lineStyle(1.5, 0x8d6e63, 1);
+					cancelBtnBg.strokeRoundedRect(280, 370, 240, 38, 8);
+				};
+				drawCancelBtn(false);
+				container.add(cancelBtnBg);
+
+				const cancelText = this.add
+					.text(400, 389, "Stay in Japanese Room (E / Esc)", {
+						fontSize: "13px",
+						fontFamily: "Outfit, sans-serif",
+						color: "#D4AF37",
+					})
+					.setOrigin(0.5);
+				container.add(cancelText);
+
+				const cancelZone = this.add
+					.rectangle(400, 389, 240, 38, 0x000000, 0)
+					.setInteractive({ useHandCursor: true })
+					.on("pointerover", () => drawCancelBtn(true))
+					.on("pointerout", () => drawCancelBtn(false))
+					.on("pointerdown", (pointer, localX, localY, event) => {
+						if (event && event.stopPropagation) event.stopPropagation();
+						if (this.audio) this.audio.playUIClick();
+						closeModal();
+					});
+				container.add(cancelZone);
 			},
 		});
 	}
 
-	confirmExit() {
-		if (this.audio) this.audio.playInteract();
+	transitionToGallery() {
+		if (this.isTransitioning) return;
+		this.isTransitioning = true;
 
-		// Handle redirection (works whether in iframe or main window)
+		if (this.player && this.player.body) {
+			this.player.body.setVelocity(0, 0);
+			this.player.body.setAcceleration(0, 0);
+		}
+
+		if (this.audio) {
+			this.audio.playDoorSlide();
+			this.audio.stopAmbience(500);
+			this.audio.stopBirds();
+		}
+
+		this.cameras.main.fadeOut(500, 0, 0, 0);
+		this.cameras.main.once(
+			Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
+			() => {
+				this.scene.start("GalleryScene");
+			}
+		);
+	}
+
+	confirmExit() {
+		if (this.audio) this.audio.playUIClick();
 		try {
 			if (window.top && window.top !== window) {
 				window.top.location.href = EXIT_REDIRECT_URL;

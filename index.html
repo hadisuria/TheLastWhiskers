@@ -60,20 +60,20 @@
 			}
 
 			header {
-				margin-top: 2rem;
-				margin-bottom: 1.5rem;
+				margin-top: 1.1rem;
+				margin-bottom: 1rem;
 				text-align: center;
 				z-index: 10;
 			}
 
 			h1 {
 				font-family: var(--font-serif);
-				font-size: 2.8rem;
+				font-size: 2.25rem;
 				font-weight: 700;
 				letter-spacing: 1px;
 				color: var(--color-primary);
 				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-				margin-bottom: 0.5rem;
+				margin-bottom: 0.3rem;
 				display: flex;
 				align-items: center;
 				justify-content: center;
@@ -82,7 +82,7 @@
 
 			.subtitle {
 				font-family: var(--font-sans);
-				font-size: 1.1rem;
+				font-size: 0.95rem;
 				font-weight: 300;
 				color: var(--color-text-muted);
 				letter-spacing: 2px;
@@ -92,28 +92,29 @@
 			.main-container {
 				display: flex;
 				flex-direction: row;
-				gap: 2rem;
-				max-width: 1650px;
-				width: 95%;
+				gap: 1.25rem;
+				max-width: 1540px;
+				width: 96%;
 				align-items: flex-start;
 				justify-content: center;
-				margin-bottom: 3rem;
+				margin-bottom: 1.5rem;
 				transition: all 0.3s ease;
 			}
 
 			/* Game Screen Frame */
 			.game-wrapper {
-				width: 100%;
-				max-width: 1200px;
+				width: auto;
+				max-width: 1100px;
 				display: flex;
 				justify-content: center;
 				align-items: center;
-				flex: 1;
+				flex: 1 1 auto;
+				min-width: 0;
 				position: relative;
 				background: var(--color-bg-card);
 				border: var(--border-glass);
 				border-radius: 16px;
-				padding: 16px;
+				padding: 12px;
 				box-shadow: var(--shadow-premium);
 				backdrop-filter: blur(10px);
 				overflow: hidden;
@@ -137,52 +138,52 @@
 			.game-frame {
 				aspect-ratio: 800 / 600;
 				width: 100%;
-				height: 100%;
-				max-width: min(90vw, 106.67vh);
-				max-height: 90vh;
+				height: auto;
+				max-width: min(100%, calc((100vh - 150px) * 4 / 3));
+				max-height: calc(100vh - 150px);
 				flex: none;
 				border: none;
 				border-radius: 8px;
 				display: block;
-				background-color: #333;
+				background-color: #1c1410;
 			}
 
 			/* Sidebar Dashboard */
 			.sidebar {
-				flex: 1;
+				flex: 0 0 clamp(300px, 28vw, 390px);
 				background: var(--color-bg-card);
 				border: var(--border-glass);
 				border-radius: 16px;
-				padding: 24px;
+				padding: 18px 20px;
 				box-shadow: var(--shadow-premium);
 				backdrop-filter: blur(10px);
-				max-width: 400px;
+				max-width: 390px;
 				display: flex;
 				flex-direction: column;
-				gap: 1.5rem;
+				gap: 1rem;
 				transition: all 0.3s ease;
 			}
 
 			.section-title {
 				font-family: var(--font-serif);
-				font-size: 1.4rem;
+				font-size: 1.25rem;
 				color: var(--color-primary);
 				border-bottom: 1px solid rgba(212, 163, 115, 0.2);
-				padding-bottom: 0.5rem;
-				margin-bottom: 0.8rem;
+				padding-bottom: 0.4rem;
+				margin-bottom: 0.65rem;
 			}
 
 			.control-group {
 				display: flex;
 				flex-direction: column;
-				gap: 0.8rem;
+				gap: 0.55rem;
 			}
 
 			.control-item {
 				display: flex;
 				align-items: center;
 				flex-wrap: wrap;
-				gap: 8px 12px;
+				gap: 6px 10px;
 			}
 
 			.key-group {
@@ -197,37 +198,35 @@
 				border: 1px solid #5c4a3e;
 				border-bottom: 3px solid #231c17;
 				border-radius: 6px;
-				padding: 4px 10px;
+				padding: 3px 8px;
 				font-family: monospace;
-				font-size: 0.9rem;
+				font-size: 0.85rem;
 				font-weight: bold;
 				color: var(--color-primary);
 				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 				text-align: center;
-				min-width: 32px;
+				min-width: 28px;
 				white-space: nowrap;
 				flex-shrink: 0;
 			}
 
 			.control-desc {
-				font-size: 0.95rem;
+				font-size: 0.88rem;
 				color: var(--color-text-light);
-				line-height: 1.4;
+				line-height: 1.35;
 			}
 
 			.item-list {
 				list-style: none;
 				display: flex;
 				flex-direction: column;
-				gap: 0.8rem;
+				gap: 0.48rem;
 			}
 
 			.item-bullet {
-				display: flex;
-				align-items: flex-start;
-				gap: 8px;
-				font-size: 0.9rem;
-				line-height: 1.4;
+				display: block;
+				font-size: 0.84rem;
+				line-height: 1.38;
 				color: var(--color-text-muted);
 			}
 
@@ -244,13 +243,24 @@
 				color: #120e0b;
 				border: none;
 				border-radius: 8px;
-				padding: 12px;
+				padding: 11px;
 				font-weight: 600;
 				cursor: pointer;
 				transition: all 0.2s ease;
 				font-family: var(--font-sans);
-				font-size: 1rem;
-				margin-top: 1rem;
+				font-size: 0.95rem;
+				margin-top: 0.35rem;
+				width: 100%;
+			}
+
+			.mobile-quick-bar {
+				display: none;
+				width: 100%;
+				max-width: 900px;
+			}
+
+			.mobile-quick-bar .btn-fullscreen {
+				margin-top: 0;
 			}
 
 			.btn-fullscreen:hover {
@@ -269,25 +279,39 @@
 
 			footer {
 				margin-top: auto;
-				padding: 2rem 0;
+				padding: 1.25rem 0;
 				color: rgba(181, 168, 158, 0.4);
 				font-size: 0.85rem;
 				text-align: center;
 			}
 
 			/* Responsive Design */
-			@media (max-width: 1600px) {
+			@media (max-width: 1024px) {
 				.main-container {
 					flex-direction: column;
 					align-items: center;
 				}
+				.game-wrapper {
+					width: 100%;
+				}
+				.game-frame {
+					max-width: min(92vw, 106.67vh);
+					max-height: 82vh;
+				}
 				.sidebar {
-					max-width: 1200px;
+					flex: 1 1 auto;
+					max-width: 900px;
 					width: 100%;
 				}
 			}
 
 			@media (max-width: 768px) {
+				.mobile-quick-bar {
+					display: flex;
+				}
+				.sidebar .btn-fullscreen {
+					display: none;
+				}
 				header {
 					margin-top: 1rem;
 					margin-bottom: 1rem;
@@ -391,6 +415,12 @@
 				></iframe>
 			</div>
 
+			<div class="mobile-quick-bar">
+				<button class="btn-fullscreen" onclick="toggleFullscreenOrFocus()">
+					📱 Play Fullscreen / Center Game
+				</button>
+			</div>
+
 			<!-- Info Sidebar -->
 			<div class="sidebar">
 				<div>
@@ -421,22 +451,32 @@
 							<span class="control-desc">to move (Keyboard)</span>
 						</div>
 						<div class="control-item">
+							<span class="key-cap">Shift</span>
+							<span class="control-desc">Hold while moving to sprint</span>
+						</div>
+						<div class="control-item">
 							<span class="key-cap">E</span>
 							<span class="control-desc"
-								>Interact with nearby items / Enter room</span
+								>Interact with items / Open doors &amp; close modals</span
+							>
+						</div>
+						<div class="control-item">
+							<span class="key-cap">A</span><span class="key-cap">D</span>
+							<span class="control-desc"
+								>Turn pages inside the Photo Album (or click arrows)</span
 							>
 						</div>
 						<div class="control-item">
 							<span class="key-cap">H</span>
 							<span class="control-desc"
-								>Toggle helper overlays (Keyboard)</span
+								>Toggle helper overlays &amp; coordinates (Keyboard)</span
 							>
 						</div>
 						<!-- Audio Controls Note (4B) -->
 						<div class="control-item">
 							<span class="control-desc"
-								><strong>Audio</strong>: Click the 🔊/🔇 button in the game
-								window to toggle sound.</span
+								><strong>Audio &amp; Rooms</strong>: Use 🔊/🔇 to mute; walk through the
+								Sliding Shoji Doors for the <strong>Photo Gallery</strong> (sparkles mark inspectable photos).</span
 							>
 						</div>
 					</div>
@@ -466,8 +506,8 @@
 							✨ <strong>Cabinet</strong> - Contains traditional tea utensils.
 						</li>
 						<li class="item-bullet">
-							✨ <strong>Sliding Shoji Doors</strong> - Gate to exit the website
-							(opens exit confirmation modal).
+							✨ <strong>Sliding Shoji Doors</strong> - Gate leading to the
+							Memorial Photo Gallery or site exit.
 						</li>
 						<li class="item-bullet">
 							✨ <strong>Lantern</strong> - Paper lantern casting a warm, gentle

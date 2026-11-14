@@ -6,7 +6,7 @@
     [400, 500]
   ],
   "center": [400, 380],
-  "playerSpawn": [400, 470],
+  "playerSpawn": [400, 410],
   "boundaryColor": "0x0000ff",
   "items": [
     {

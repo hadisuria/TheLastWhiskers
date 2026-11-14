@@ -1,355 +1,226 @@
 import Phaser from "phaser";
-import { pointInPolygon } from "../utils/geometry.js";
+import { pointInPolygon, constrainToPolygonWithSlide } from "../utils/geometry.js";
 import TouchControls from "../ui/TouchControls.js";
 import AudioManager from "../AudioManager.js";
+import Player from "../entities/Player.js";
+import { CONFIG } from "../config.js";
 
 /**
  * BaseRoomScene — shared base for JapaneseRoomScene and GalleryScene.
- *
- * Phase 4 additions:
- *  - 4A: Touch controls via TouchControls.js; touchVelocity merged here in
- *         handlePlayerMovement() — no movement code duplicated.
- *  - 4B: AudioManager instance created here so subclasses can call
- *         this.audio.playFootstep() etc.  Subclasses call startAmbience()
- *         in their own create() after calling super setup.
- *  - 4C: Cat animation plumbing (anims.create for idle/walk).  Works as a
- *         graceful one-frame fallback when only cat.png is present.  When a
- *         real spritesheet is dropped in, only ANIM_CONFIG needs updating.
+ * Provides unified Player instantiation, boundary collision, touch controls,
+ * audio initialization, and bottom HUD interaction prompts.
  */
-
-// ---------------------------------------------------------------------------
-// 4C — Animation config
-// Changing these values (or providing a real spritesheet) requires NO other
-// code changes — the animation system reads everything from here.
-// ---------------------------------------------------------------------------
-const ANIM_CONFIG = {
-	/**
-	 * Set to true once a real multi-frame walk-cycle spritesheet is provided.
-	 * When false, both idle and walk play a single frame (= current behaviour).
-	 */
-	hasRealSpritesheet: false,
-
-	idle: {
-		key: 'cat-idle',
-		frames: [0],       // single frame fallback; replace with [0,1] etc.
-		frameRate: 4,
-		repeat: -1,
-	},
-	walk: {
-		key: 'cat-walk',
-		frames: [0],       // single frame fallback; replace with [0,1,2,3] etc.
-		frameRate: 8,
-		repeat: -1,
-	},
-};
-
 export default class BaseRoomScene extends Phaser.Scene {
 	constructor(config) {
 		super(config);
 		this.roomPolygon = [];
 		this.roomCenter = { x: 400, y: 370 };
 
-		// FLIP DIRECTION STANDARDIZATION:
-		// Cat sprite (cat.png) naturally faces LEFT (un-flipped / flipX = false).
-		// Moving left (vx < 0) -> setFlipX(false) -> sprite faces left.
-		// Moving right (vx > 0) -> setFlipX(true) -> sprite faces right.
-		this.flipOnLeft = false;
+		/** @type {Player|null} */
+		this.player = null;
 
-		/** @type {TouchControls|null} Initialised in setupPlayer() */
+		/** @type {TouchControls|null} */
 		this.touchControls = null;
 
-		/** @type {AudioManager|null} Initialised in initAudio() */
+		/** @type {AudioManager|null} */
 		this.audio = null;
+
+		this.activeItem = null;
+		this.showHelpOverlays = false;
+		this.isTransitioning = false;
 	}
 
 	// ---------------------------------------------------------------------------
-	// 4B — Audio initialisation (called by subclass create() after preload done)
+	// Audio Initialisation
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Creates the AudioManager and (optionally) starts ambience.
-	 * Subclasses call this inside create() after scene setup.
+	 * Creates the AudioManager and starts room ambience.
 	 * @param {boolean} [startAmbience=true]
+	 * @param {string} [ambienceKey]
 	 */
-	initAudio(startAmbience = true) {
+	initAudio(startAmbience = true, ambienceKey = CONFIG.audio.roomAmbience.key) {
 		this.audio = new AudioManager(this);
 		if (startAmbience) {
-			this.audio.startAmbience();
+			this.audio.startAmbience(ambienceKey);
 			this.audio.startBirds();
 		}
 	}
 
 	// ---------------------------------------------------------------------------
-	// 4C — Animation creation
-	// Call once after the 'cat' texture is registered (after createTransparentTexture)
+	// Player Lifecycle & Movement
 	// ---------------------------------------------------------------------------
 
 	/**
-	 * Registers idle and walk animations on the 'cat' texture.
-	 * Works correctly with a single-frame texture (no visual regression).
+	 * Spawns the Player entity, registers physics colliders, and wires inputs.
 	 */
-	createCatAnimations() {
-		const cfg = ANIM_CONFIG;
-
-		// generateFrameNumbers requires the texture to have been loaded as a
-		// spritesheet. With the current single cat.png (loaded as a canvas
-		// texture via createTransparentTexture), we build frames manually using
-		// frame index 0.  When a real spritesheet is provided (hasRealSpritesheet
-		// = true), generateFrameNumbers works normally.
-		const makeFrames = (frameIndices) => {
-			if (cfg.hasRealSpritesheet) {
-				return this.anims.generateFrameNumbers('cat', { frames: frameIndices });
-			}
-			// Single-frame fallback: one frame object per entry (deduped to just one)
-			return [{ key: 'cat', frame: 0 }];
-		};
-
-		try {
-			this.anims.create({
-				key: cfg.idle.key,
-				frames: makeFrames(cfg.idle.frames),
-				frameRate: cfg.idle.frameRate,
-				repeat: cfg.idle.repeat,
-			});
-
-			this.anims.create({
-				key: cfg.walk.key,
-				frames: makeFrames(cfg.walk.frames),
-				frameRate: cfg.walk.frameRate,
-				repeat: cfg.walk.repeat,
-			});
-		} catch (e) {
-			console.warn('[BaseRoomScene] Could not create cat animations:', e.message);
-		}
-	}
-
-	/**
-	 * Transitions the player sprite between idle and walk animations based on
-	 * current velocity. Safe to call every frame — Phaser ignores play() calls
-	 * for the already-playing animation.
-	 * @param {number} vx
-	 * @param {number} vy
-	 */
-	_updateCatAnimation(vx, vy) {
-		if (!this.player || !this.player.anims) return;
-		const isMoving = vx !== 0 || vy !== 0;
-		const targetAnim = isMoving ? ANIM_CONFIG.walk.key : ANIM_CONFIG.idle.key;
-
-		// Check if animation exists in cache before playing, or fallback to texture
-		if (!this.anims.exists(targetAnim)) {
-			// Fallback: If animations are somehow missing/unregistered, use static frame 0 (if texture exists)
-			if (this.player.texture) {
-				this.player.setFrame(0);
-			}
-			return;
+	setupPlayer() {
+		this.isTransitioning = false;
+		if (this.input?.keyboard) {
+			this.input.keyboard.enabled = true;
 		}
 
-		// Ensure the sprite's animation controller is bound to the texture data correctly
-		if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== targetAnim) {
-			try {
-				if (this.player.texture) {
-					this.player.play(targetAnim, true);
-				}
-			} catch (e) {
-				console.warn('[BaseRoomScene] Failed to play animation:', e.message);
-				if (this.player.texture) {
-					this.player.setFrame(0);
-				}
-			}
-		}
-	}
+		const [spawnX, spawnY] = this.playerSpawn || [400, 300];
+		this.player = new Player(this, spawnX, spawnY);
 
-	// ---------------------------------------------------------------------------
-	// 4A — Movement: keyboard + touch velocity merged here
-	// ---------------------------------------------------------------------------
-
-	handlePlayerMovement() {
-		const playerBody = this.player.body;
-		playerBody.setVelocity(0);
-
-		const speed = 150;
-		let vx = 0;
-		let vy = 0;
-
-		// --- Keyboard input --------------------------------------------------
-		if (this.cursors.left.isDown || this.wasd.left.isDown) {
-			vx = -speed;
-		} else if (this.cursors.right.isDown || this.wasd.right.isDown) {
-			vx = speed;
-		}
-
-		if (this.cursors.up.isDown || this.wasd.up.isDown) {
-			vy = -speed;
-		} else if (this.cursors.down.isDown || this.wasd.down.isDown) {
-			vy = speed;
-		}
-
-		// Normalize diagonal (keyboard)
-		if (vx !== 0 && vy !== 0) {
-			vx *= 0.7071;
-			vy *= 0.7071;
-		}
-
-		// --- Touch D-pad input (4A) ------------------------------------------
-		if (this.touchControls) {
-			this.touchControls.update();
-			const tv = this.touchControls.touchVelocity;
-			// Merge: touch overrides keyboard on the axes it supplies
-			if (tv.x !== 0 || tv.y !== 0) {
-				vx = tv.x;
-				vy = tv.y;
-				this.moveTarget = null; // Manual D-pad cancels tap destination
-			}
-		}
-
-		if (vx !== 0 || vy !== 0) {
-			this.moveTarget = null; // Manual keyboard cancels tap destination
-		} else if (this.moveTarget) {
-			// Tap-to-move destination navigation
-			const dx = this.moveTarget.x - this.player.x;
-			const dy = this.moveTarget.y - this.player.y;
-			const dist = Math.sqrt(dx * dx + dy * dy);
-
-			if (dist < 10) {
-				this.moveTarget = null;
-				if (this.pendingItemInteraction) {
-					this.tapInteractRequested = true;
-					this.pendingItemInteraction = null;
-				}
-			} else {
-				vx = (dx / dist) * speed;
-				vy = (dy / dist) * speed;
-			}
-		}
-
-		playerBody.setVelocity(vx, vy);
-
-		// --- Sprite flip -----------------------------------------------------
-		if (vx < 0) {
-			this.player.setFlipX(this.flipOnLeft);
-		} else if (vx > 0) {
-			this.player.setFlipX(!this.flipOnLeft);
-		}
-
-		// --- 4C: Animation state machine ------------------------------------
-		this._updateCatAnimation(vx, vy);
-
-		// --- Visual splash puff (unchanged cadence) --------------------------
-		if (vx !== 0 || vy !== 0) {
-			const now = this.time.now;
-			if (now > (this.lastSplashTime || 0) + 150) {
-				this.createPlayerSplashEffect();
-				this.lastSplashTime = now;
-			}
-		}
-
-		// --- 4B: Footstep sound — independent timer, fires on first frame ----
-		// _footstepTime is reset to 0 when the player stops so the NEXT
-		// movement always gets an immediate first step.
-		const isMoving = vx !== 0 || vy !== 0;
-		if (isMoving) {
-			const now = this.time.now;
-			const minInterval = 180; // ms — should match SOUND_CONFIG.footstep.minInterval
-			if (now > (this._footstepTime || 0) + minInterval) {
-				if (this.audio) this.audio.playFootstep();
-				this._footstepTime = now;
-			}
-		} else {
-			// Reset so next movement starts a step immediately
-			this._footstepTime = 0;
-		}
-	}
-
-	handlePlayerBoundaries(delta) {
-		const prevX = this.player.x;
-		const prevY = this.player.y;
-
-		const dt = delta / 1000;
-		const nextX = this.player.x + this.player.body.velocity.x * dt;
-		const nextY = this.player.y + this.player.body.velocity.y * dt;
-		const nextPosition = { x: nextX, y: nextY };
-
-		if (pointInPolygon(nextPosition, this.roomPolygon)) {
-			return;
-		}
-
-		const currentPosition = { x: prevX, y: prevY };
-		const isCurrentlyInside = pointInPolygon(currentPosition, this.roomPolygon);
-
-		if (!isCurrentlyInside) {
-			const distPrev = Phaser.Math.Distance.Between(prevX, prevY, this.roomCenter.x, this.roomCenter.y);
-			const distNext = Phaser.Math.Distance.Between(nextX, nextY, this.roomCenter.x, this.roomCenter.y);
-			if (distNext < distPrev) {
-				return;
-			}
-		}
-
-		const testX = { x: nextX, y: prevY };
-		if (!pointInPolygon(testX, this.roomPolygon)) {
-			this.player.x = prevX;
-			this.player.body.setVelocityX(0);
-			if (this.moveTarget) this.moveTarget = null;
-		}
-
-		const testY = { x: prevX, y: nextY };
-		if (!pointInPolygon(testY, this.roomPolygon)) {
-			this.player.y = prevY;
-			this.player.body.setVelocityY(0);
-			if (this.moveTarget) this.moveTarget = null;
-		}
-	}
-
-	updateCoordinatesDisplay() {
-		this.coordText.setText(
-			`Player: x=${Math.round(this.player.x)}, y=${Math.round(this.player.y)}`,
-		);
-	}
-
-	toggleHelpOverlays() {
-		this.interactableItems.forEach((item) => {
-			if (this.showHelpOverlays) {
-				item.setAlpha(item === this.activeItem ? 0.4 : 0.2);
-				if (item.label) item.label.setVisible(true);
-			} else {
-				item.setAlpha(0);
-				if (item.label) item.label.setVisible(false);
-			}
-		});
-
-		this.boundaries.getChildren().forEach((wall) => {
-			wall.setAlpha(this.showHelpOverlays ? 0.3 : 0);
-		});
-	}
-
-	createPlayerSplashEffect() {
 		if (this.walkEmitter) {
-			this.walkEmitter.explode(2, this.player.x, this.player.y + 10);
+			this.player.setDustEmitter(this.walkEmitter);
+		}
+
+		if (this.interactableItems) {
+			this.physics.add.collider(this.player, this.interactableItems);
+		}
+
+		this.interactKey = this.input.keyboard.addKey("E");
+		this.helpKey = this.input.keyboard.addKey("H");
+
+		this.setupTouchControls();
+	}
+
+	/**
+	 * Delegates movement and procedural animation to the Player entity.
+	 * @param {number} time
+	 * @param {number} delta
+	 */
+	handlePlayerMovement(time, delta) {
+		if (this.player && this.player.update) {
+			this.player.update(time, delta);
 		}
 	}
+
+	/**
+	 * Constrains player inside the room's isometric polygon boundary using smooth wall sliding.
+	 * Never gets stuck on edges or corners.
+	 * @param {number} delta
+	 */
+	handlePlayerBoundaries(delta) {
+		if (!this.player || !this.player.body || this.isTransitioning) return;
+
+		const currentPos = { x: this.player.x, y: this.player.y };
+		const dt = delta / 1000;
+		const nextPos = {
+			x: this.player.x + this.player.body.velocity.x * dt,
+			y: this.player.y + this.player.body.velocity.y * dt,
+		};
+		const velocity = { x: this.player.body.velocity.x, y: this.player.body.velocity.y };
+
+		const res = constrainToPolygonWithSlide(
+			currentPos,
+			nextPos,
+			velocity,
+			this.roomPolygon,
+			this.roomCenter
+		);
+
+		this.player.x = res.x;
+		this.player.y = res.y;
+		this.player.body.setVelocity(res.vx, res.vy);
+	}
+
+	// ---------------------------------------------------------------------------
+	// Particle Effects
+	// ---------------------------------------------------------------------------
 
 	createParticleEffects() {
 		this.particleManager = this.add.particles("particle");
 
 		this.walkEmitter = this.particleManager.createEmitter({
-			speed: { min: 10, max: 30 },
+			speed: { min: 8, max: 25 },
 			angle: { min: 0, max: 360 },
-			scale: { start: 0.15, end: 0.05 },
-			alpha: { start: 0.5, end: 0 },
-			lifespan: 300,
+			scale: { start: 0.14, end: 0.04 },
+			alpha: { start: 0.45, end: 0 },
+			lifespan: 250,
 			tint: 0xeeddbb,
-			frequency: -1, // Emit manually
+			frequency: -1, // Emitted manually by Player
 		});
+
+		if (this.player) {
+			this.player.setDustEmitter(this.walkEmitter);
+		}
 	}
 
 	// ---------------------------------------------------------------------------
-	// 4A — Touch interact detection (used by subclass handleItemInteractions)
+	// Item Interactions & Proximity Detection (Bottom HUD only, no in-map clutter)
 	// ---------------------------------------------------------------------------
 
-	/**
-	 * Returns true if the E key was just pressed OR the touch interact button
-	 * was tapped OR a tap-to-move destination near an item was reached.
-	 * @returns {boolean}
-	 */
+	triggerItemFeedback(item) {
+		this.tweens.add({
+			targets: item,
+			scaleX: 1.08,
+			scaleY: 1.08,
+			duration: 90,
+			yoyo: true,
+			ease: 'Quad.easeInOut',
+		});
+	}
+
+	handleItemInteractions() {
+		if (!this.player || !this.interactableItems || this.isTransitioning) return;
+
+		let closestItem = null;
+		let minScore = Infinity;
+		let closestDist = Infinity;
+		const interactRange = CONFIG.interaction.range;
+		const portalTypes = new Set(["gallery-door", "exit-gate", "room-exit"]);
+
+		for (let i = 0; i < this.interactableItems.length; i++) {
+			const item = this.interactableItems[i];
+			const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
+			if (dist >= interactRange) continue;
+			const score = portalTypes.has(item.type) ? dist - 18 : dist;
+			if (score < minScore) {
+				minScore = score;
+				closestDist = dist;
+				closestItem = item;
+			}
+		}
+
+		if (closestItem && closestDist < interactRange) {
+			this.activeItem = closestItem;
+
+			// Bottom accessibility banner only (no in-map inspect overlays)
+			if (this.interactText) {
+				if (this.activeItem.type === "gallery-door" || this.activeItem.type === "exit-gate") {
+					this.interactText.setText("Press E to open sliding shoji doors");
+				} else if (this.activeItem.type === "room-exit") {
+					this.interactText.setText("Press E to return to Japanese Room");
+				} else if (this.activeItem.type === "album-trigger") {
+					this.interactText.setText("Press E to open the memorial photo album");
+				} else {
+					this.interactText.setText(`Press E to examine the ${this.activeItem.name}`);
+				}
+				this.interactText.setVisible(true);
+			}
+
+			if (this.showHelpOverlays) {
+				this.interactableItems.forEach((item) => {
+					item.setAlpha(item === this.activeItem ? 0.45 : 0.2);
+				});
+			}
+
+			// Check interaction trigger
+			if (this.isInteractJustPressed()) {
+				this.triggerItemFeedback(this.activeItem);
+				if (this.onItemInteract) {
+					this.onItemInteract(this.activeItem);
+				}
+			}
+		} else {
+			this.activeItem = null;
+			if (this.interactText) this.interactText.setVisible(false);
+
+			if (this.showHelpOverlays) {
+				this.interactableItems.forEach((item) => {
+					item.setAlpha(0.2);
+				});
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	// Input Helpers & Touch Setup
+	// ---------------------------------------------------------------------------
+
 	isInteractJustPressed() {
 		const keyboard = Phaser.Input.Keyboard.JustDown(this.interactKey);
 		const touch = this.touchControls ? this.touchControls.consumeInteract() : false;
@@ -358,30 +229,14 @@ export default class BaseRoomScene extends Phaser.Scene {
 		return keyboard || touch || tap;
 	}
 
-	// ---------------------------------------------------------------------------
-	// 4A — Touch controls setup (call from subclass setupPlayer())
-	// ---------------------------------------------------------------------------
-
-	/**
-	 * Creates the TouchControls instance and attaches it to this scene.
-	 * Also sets up tap-to-move canvas pointer listener.
-	 */
 	setupTouchControls() {
-		this.touchControls = new TouchControls(this, 150);
+		this.touchControls = new TouchControls(this, CONFIG.physics.walkSpeed);
 
-		// Pointer listener for tap-to-move on mobile/touch & desktop click
 		this.input.on('pointerdown', (pointer, currentlyOver) => {
-			if (this.isAlbumOpen || this.isZoomed || this.isExitModalOpen) return;
-
-			// Don't set move target if tapping any interactive UI element (modal buttons, mute button, etc.)
+			if (this.isAlbumOpen || this.isZoomed || this.isExitModalOpen || this.isTransitioning) return;
 			if (currentlyOver && currentlyOver.length > 0) return;
+			if (this._muteButton && this._muteButton.getBounds().contains(pointer.x, pointer.y)) return;
 
-			// Don't set move target if tapping top-right mute button
-			if (this._muteButton && this._muteButton.getBounds().contains(pointer.x, pointer.y)) {
-				return;
-			}
-
-			// Check if tapping on or near an interactable item
 			let tappedItem = null;
 			if (this.interactableItems) {
 				for (const item of this.interactableItems) {
@@ -396,7 +251,7 @@ export default class BaseRoomScene extends Phaser.Scene {
 
 			if (tappedItem) {
 				const currentDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, tappedItem.x, tappedItem.y);
-				if (currentDist < 80) {
+				if (currentDist < CONFIG.interaction.range) {
 					this.tapInteractRequested = true;
 					this.moveTarget = null;
 				} else {
@@ -411,12 +266,110 @@ export default class BaseRoomScene extends Phaser.Scene {
 	}
 
 	// ---------------------------------------------------------------------------
-	// Shared Scene Setup Methods
+	// HUD UI & Boundaries
 	// ---------------------------------------------------------------------------
 
-	/**
-	 * Creates invisible boundary walls along roomPolygon for visual debug display.
-	 */
+	setupUI(bannerText = "") {
+		this.interactText = this.add
+			.text(400, 530, "", {
+				fontSize: "15px",
+				fontFamily: "Outfit, monospace",
+				fill: "#F7E9D7",
+				backgroundColor: "#3a2a1e",
+				padding: { x: 12, y: 6 },
+				stroke: "#1a0f08",
+				strokeThickness: 2,
+			})
+			.setOrigin(0.5)
+			.setDepth(150);
+		this.interactText.setVisible(false);
+
+		if (bannerText) {
+			this.bannerText = this.add
+				.text(400, 28, bannerText, {
+					fontSize: "13px",
+					fontFamily: "Outfit, monospace",
+					fill: "#F7E9D7",
+					backgroundColor: "rgba(42, 28, 18, 0.75)",
+					padding: { x: 12, y: 5 },
+					stroke: "#1a0f08",
+					strokeThickness: 1.5,
+				})
+				.setOrigin(0.5)
+				.setDepth(150);
+		}
+
+		this.coordText = this.add
+			.text(12, 570, "Player: x=0, y=0", {
+				fontSize: "12px",
+				fontFamily: "monospace",
+				fill: "#F7E9D7",
+				backgroundColor: "rgba(26, 15, 8, 0.78)",
+				padding: { x: 6, y: 3 },
+			})
+			.setDepth(150)
+			.setVisible(false);
+
+		this.createMuteButton();
+		this.cameras.main.fadeIn(600, 0, 0, 0);
+	}
+
+	createMuteButton() {
+		const isMuted = this.audio ? this.audio.isMuted : false;
+		const btn = this.add
+			.text(785, 12, isMuted ? '🔇' : '🔊', {
+				fontSize: '20px',
+				fontFamily: 'monospace',
+				backgroundColor: '#2d1a0e',
+				padding: { x: 10, y: 6 },
+			})
+			.setOrigin(1, 0)
+			.setDepth(300)
+			.setInteractive({ useHandCursor: true })
+			.on('pointerdown', (pointer, localX, localY, event) => {
+				if (event && event.stopPropagation) event.stopPropagation();
+				if (!this.audio) return;
+				const muted = this.audio.toggleMute();
+				btn.setText(muted ? '🔇' : '🔊');
+			})
+			.on('pointerover', () => btn.setAlpha(0.8))
+			.on('pointerout', () => btn.setAlpha(1));
+
+		this._muteButton = btn;
+	}
+
+	updateCoordinatesDisplay() {
+		if (this.coordText && this.player) {
+			this.coordText.setText(
+				`Player: x=${Math.round(this.player.x)}, y=${Math.round(this.player.y)}`,
+			);
+		}
+	}
+
+	toggleHelpOverlays() {
+		if (this.coordText) {
+			this.coordText.setVisible(Boolean(this.showHelpOverlays));
+		}
+
+		if (this.interactableItems) {
+			this.interactableItems.forEach((item) => {
+				if (this.showHelpOverlays) {
+					item.setAlpha(item === this.activeItem ? 0.45 : 0.2);
+					if (item.label) item.label.setVisible(true);
+				} else {
+					item.setAlpha(0);
+					if (item.label) item.label.setVisible(false);
+				}
+			});
+		}
+
+		if (this.boundaries) {
+			this.boundaries.getChildren().forEach((wall) => {
+				wall.setAlpha(this.showHelpOverlays ? 0.3 : 0);
+			});
+		}
+	}
+
 	createBoundaries() {
 		this.boundaries = this.add.group();
 		if (!this.roomPolygon || this.roomPolygon.length === 0) return;
@@ -440,9 +393,6 @@ export default class BaseRoomScene extends Phaser.Scene {
 		}
 	}
 
-	/**
-	 * Creates interactive physics rectangles and hidden text labels from roomItemsData.
-	 */
 	createInteractiveAreas() {
 		this.interactableItems = [];
 		if (!this.roomItemsData) return;
@@ -471,7 +421,7 @@ export default class BaseRoomScene extends Phaser.Scene {
 			const label = this.add
 				.text(item.x, item.y, item.name, {
 					fontSize: "12px",
-					fontFamily: "Arial",
+					fontFamily: "Outfit, Arial",
 					color: "#FFFFFF",
 					backgroundColor: "#000000",
 					padding: { x: 3, y: 3 },
@@ -482,112 +432,5 @@ export default class BaseRoomScene extends Phaser.Scene {
 			graphics.label = label;
 			this.interactableItems.push(graphics);
 		});
-	}
-
-	/**
-	 * Spawns player sprite, configures physics body, inputs, and touch controls.
-	 */
-	setupPlayer() {
-		const [spawnX, spawnY] = this.playerSpawn || [400, 300];
-		this.player = this.physics.add.sprite(spawnX, spawnY, "cat");
-		this.player.setDisplaySize(40, 40);
-		this.player.body.setSize(30, 30);
-		this.player.body.setCollideWorldBounds(true);
-
-		if (this.interactableItems) {
-			this.physics.add.collider(this.player, this.interactableItems);
-		}
-
-		this.cursors = this.input.keyboard.createCursorKeys();
-		this.wasd = this.input.keyboard.addKeys({
-			up: Phaser.Input.Keyboard.KeyCodes.W,
-			down: Phaser.Input.Keyboard.KeyCodes.S,
-			left: Phaser.Input.Keyboard.KeyCodes.A,
-			right: Phaser.Input.Keyboard.KeyCodes.D,
-		});
-		this.interactKey = this.input.keyboard.addKey("E");
-		this.helpKey = this.input.keyboard.addKey("H");
-
-		this.setupTouchControls();
-	}
-
-	/**
-	 * Configures standard room HUD elements (interaction prompt, top banner, coordinates, mute button).
-	 * @param {string} bannerText
-	 */
-	setupUI(bannerText = "") {
-		this.interactText = this.add
-			.text(400, 530, "", {
-				fontSize: "16px",
-				fontFamily: "monospace",
-				fill: "#F7E9D7",
-				backgroundColor: "#4A3C31",
-				padding: { x: 10, y: 5 },
-				stroke: "#000000",
-				strokeThickness: 2,
-			})
-			.setOrigin(0.5)
-			.setDepth(150);
-		this.interactText.setVisible(false);
-
-		if (bannerText) {
-			this.add
-				.text(400, 45, bannerText, {
-					fontSize: "15px",
-					fontFamily: "monospace",
-					fill: "#F7E9D7",
-					backgroundColor: "#4A3C31",
-					padding: { x: 10, y: 5 },
-					stroke: "#000000",
-					strokeThickness: 2,
-				})
-				.setOrigin(0.5)
-				.setDepth(150);
-		}
-
-		this.coordText = this.add
-			.text(10, 10, "Player: x=0, y=0", {
-				fontSize: "14px",
-				fontFamily: "Arial",
-				fill: "#FFFFFF",
-				backgroundColor: "#000000",
-				padding: { x: 5, y: 2 },
-			})
-			.setDepth(150);
-
-		this.createMuteButton();
-		this.cameras.main.fadeIn(800, 0, 0, 0);
-	}
-
-	// ---------------------------------------------------------------------------
-	// 4B — Mute toggle UI button
-	// Creates a small on-screen 🔊/🔇 button rendered in the Phaser canvas.
-	// ---------------------------------------------------------------------------
-
-	/**
-	 * Adds a mute/unmute toggle button to the top-right corner of the scene.
-	 * Call from subclass setupUI() after initAudio().
-	 */
-	createMuteButton() {
-		const btn = this.add
-			.text(785, 12, '🔊', {
-				fontSize: '22px',
-				fontFamily: 'monospace',
-				backgroundColor: '#2d1a0e',
-				padding: { x: 10, y: 6 },
-			})
-			.setOrigin(1, 0)
-			.setDepth(300)
-			.setInteractive({ useHandCursor: true })
-			.on('pointerdown', (pointer, localX, localY, event) => {
-				if (event && event.stopPropagation) event.stopPropagation();
-				if (!this.audio) return;
-				const muted = this.audio.toggleMute();
-				btn.setText(muted ? '🔇' : '🔊');
-			})
-			.on('pointerover', () => btn.setAlpha(0.8))
-			.on('pointerout', () => btn.setAlpha(1));
-
-		this._muteButton = btn;
 	}
 }

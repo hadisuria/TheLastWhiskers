@@ -14,47 +14,50 @@ export default class GalleryScene extends BaseRoomScene {
 		this.playerSpawn = galleryData.playerSpawn;
 		this.boundaryColor = Number(galleryData.boundaryColor || "0x0000ff");
 		this.roomItemsData = galleryData.items;
-		this.flipOnLeft = false;
 	}
-
-	// preload() is intentionally omitted — all assets are loaded by PreloadScene
-	// (Phase 4D). Adding new assets: add them to PreloadScene.preload() instead.
 
 	create() {
 		this.activeItem = null;
 		this.showHelpOverlays = false;
 		this.isZoomed = false;
 
-		// Setup room bg
+		// Room background
 		const bg = this.add.image(400, 300, "gallery-room");
 		bg.setDisplaySize(800, 600);
 
-		// Setup base room components
+		// Boundaries & items
 		this.createBoundaries();
 		this.createInteractiveAreas();
+		this.createGalleryCues();
+
+		// Particle systems
+		this.createParticleEffects();
+
+		// Player
 		this.setupPlayer();
-		this.createCatAnimations();
 
 		const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 		const bannerText = isTouch
 			? "Tap screen / D-pad to move • Tap E or photos to inspect"
-			: "Memorial Photo Room. E to inspect photos. H to toggle help overlays.";
+			: "Memorial Photo Gallery • E to inspect photos • Shoji door to return";
 		this.setupUI(bannerText);
 
-		// Systems
-		this.createParticleEffects();
-
-		// 4B — Audio
+		// Audio
 		this.initAudio(true);
 	}
 
 	update(time, delta) {
 		if (this.isZoomed) {
-			this.player.body.setVelocity(0);
+			if (this.interactKey) Phaser.Input.Keyboard.JustDown(this.interactKey);
+			this.tapInteractRequested = false;
+			if (this.player && this.player.body) {
+				this.player.body.setVelocity(0);
+				this.player.body.setAcceleration(0, 0);
+			}
 			return;
 		}
 
-		this.handlePlayerMovement();
+		this.handlePlayerMovement(time, delta);
 		this.handlePlayerBoundaries(delta);
 		this.updateCoordinatesDisplay();
 		this.handleItemInteractions();
@@ -65,63 +68,104 @@ export default class GalleryScene extends BaseRoomScene {
 		}
 	}
 
-	handleItemInteractions() {
-		this.activeItem = null;
-		this.interactText.setVisible(false);
-
-		const sortedItems = this.interactableItems
-			.map((item) => {
-				const distance = Phaser.Math.Distance.Between(
-					this.player.x,
-					this.player.y,
-					item.x,
-					item.y,
-				);
-				return { item, distance };
+		// Exit indicator pill on the bottom tatami threshold (depth below player)
+	createGalleryCues() {
+		const exitHint = this.add
+			.text(400, 492, "▼ Exit to Japanese Room", {
+				fontSize: "12px",
+				fontFamily: "Outfit, monospace",
+				fill: "#F7E9D7",
+				backgroundColor: "rgba(45, 26, 18, 0.82)",
+				padding: { x: 10, y: 4 },
+				stroke: "#d4af37",
+				strokeThickness: 1,
 			})
-			.sort((a, b) => a.distance - b.distance);
+			.setOrigin(0.5)
+			.setDepth(5);
+		this.tweens.add({
+			targets: exitHint,
+			y: 496,
+			alpha: { from: 0.85, to: 1 },
+			duration: 1100,
+			yoyo: true,
+			repeat: -1,
+			ease: "Sine.easeInOut",
+		});
 
-		if (sortedItems.length > 0 && sortedItems[0].distance < 80) {
-			this.activeItem = sortedItems[0].item;
-			if (this.activeItem.type === "room-exit") {
-				this.interactText.setText(`Press E to return to Japanese Room`);
-			} else {
-				this.interactText.setText(`Press E to inspect ${this.activeItem.name}`);
-			}
-			this.interactText.setVisible(true);
+		// Subtle pulsing shimmer marker on each inspectable photo display
+		if (this.interactableItems) {
+			this.interactableItems.forEach((item, index) => {
+				if (item.type !== "photo-display") return;
 
-			if (this.showHelpOverlays) {
-				this.interactableItems.forEach((item) => {
-					item.setAlpha(item === this.activeItem ? 0.4 : 0.2);
+				const glow = this.add
+					.circle(item.x, item.y, 16, 0xffd57e, 0.22)
+					.setDepth(4);
+				const sparkle = this.add
+					.text(item.x, item.y - 2, "✦", {
+						fontSize: "16px",
+						color: "#ffe49e",
+						stroke: "#2d1a12",
+						strokeThickness: 3,
+					})
+					.setOrigin(0.5)
+					.setDepth(5);
+
+				this.tweens.add({
+					targets: glow,
+					scale: { from: 0.85, to: 1.35 },
+					alpha: { from: 0.16, to: 0.36 },
+					duration: 1300,
+					delay: index * 220,
+					yoyo: true,
+					repeat: -1,
+					ease: "Sine.easeInOut",
 				});
-			}
-		} else if (this.showHelpOverlays) {
-			this.interactableItems.forEach((item) => {
-				item.setAlpha(0.2);
+
+				this.tweens.add({
+					targets: sparkle,
+					y: item.y - 6,
+					alpha: { from: 0.65, to: 1 },
+					duration: 1300,
+					delay: index * 220,
+					yoyo: true,
+					repeat: -1,
+					ease: "Sine.easeInOut",
+				});
 			});
 		}
+	}
 
-		// 4A: isInteractJustPressed() checks keyboard AND touch interact button
-		if (this.isInteractJustPressed() && this.activeItem) {
-			if (this.activeItem.type === "room-exit") {
-				this.player.body.setVelocity(0);
-				this.input.keyboard.enabled = false;
-				// 4B — Stop ambience and birds before leaving
-				if (this.audio) { this.audio.stopAmbience(400); this.audio.stopBirds(); }
-				this.cameras.main.fadeOut(800, 0, 0, 0);
-				this.cameras.main.once(
-					Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
-					() => {
-						this.input.keyboard.enabled = true;
-						this.scene.start("JapaneseRoomScene");
-					},
-				);
-			} else {
-				// 4B — Interact chime on photo zoom
-				if (this.audio) this.audio.playInteract();
-				this.zoomPhoto(this.activeItem);
-			}
+	onItemInteract(item) {
+		if (item.type === "room-exit") {
+			this.returnToJapaneseRoom();
+		} else {
+			if (this.audio) this.audio.playInteract();
+			this.zoomPhoto(item);
 		}
+	}
+
+	returnToJapaneseRoom() {
+		if (this.isTransitioning) return;
+		this.isTransitioning = true;
+
+		if (this.player && this.player.body) {
+			this.player.body.setVelocity(0, 0);
+			this.player.body.setAcceleration(0, 0);
+		}
+
+		if (this.audio) {
+			this.audio.playDoorSlide();
+			this.audio.stopAmbience(500);
+			this.audio.stopBirds();
+		}
+
+		this.cameras.main.fadeOut(500, 0, 0, 0);
+		this.cameras.main.once(
+			Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
+			() => {
+				this.scene.start("JapaneseRoomScene");
+			}
+		);
 	}
 
 	zoomPhoto(item) {
@@ -129,43 +173,43 @@ export default class GalleryScene extends BaseRoomScene {
 
 		openModal(this, {
 			overlayAlpha: 0.75,
+			onCloseStart: () => {
+				this.isZoomed = false;
+			},
 			onClose: () => {
 				this.isZoomed = false;
 			},
 			buildContent: (container) => {
-				// Draw a beautiful ornate wooden frame
+				// Ornate wooden frame
 				const frame = this.add.graphics();
-				// Shadow
 				frame.fillStyle(0x000000, 0.4);
 				frame.fillRoundedRect(235, 75, 330, 450, 15);
-				// Outer frame
-				frame.fillStyle(0x4a3c31, 1); // Dark walnut wood color
+
+				frame.fillStyle(0x4a3c31, 1);
 				frame.fillRoundedRect(230, 70, 340, 460, 12);
-				// Inner border (gold bevel)
-				frame.lineStyle(4, 0xd4af37, 1); // Gold lining
+
+				frame.lineStyle(4, 0xd4af37, 1);
 				frame.strokeRoundedRect(244, 84, 312, 432, 8);
-				// Inner mounting board (cream color)
+
 				frame.fillStyle(0xf4efe5, 1);
 				frame.fillRoundedRect(248, 88, 304, 424, 6);
-
 				container.add(frame);
 
-				// The actual zoomed cat photo
+				// Zoomed cat photo
 				const catImage = this.add.image(400, 240, item.photoKey);
 				catImage.setDisplaySize(260, 260);
 				container.add(catImage);
 
-				// Add a thin dark line around the photo to mount it visually
 				const photoBorder = this.add.graphics();
 				photoBorder.lineStyle(2, 0x333333, 0.8);
 				photoBorder.strokeRect(270, 110, 260, 260);
 				container.add(photoBorder);
 
-				// Description text
+				// Description
 				const descText = this.add
 					.text(400, 420, item.description, {
 						fontSize: "15px",
-						fontFamily: "monospace",
+						fontFamily: "Outfit, monospace",
 						fill: "#2A2015",
 						align: "center",
 						wordWrap: { width: 260 },
@@ -174,7 +218,7 @@ export default class GalleryScene extends BaseRoomScene {
 					.setOrigin(0.5);
 				container.add(descText);
 
-				// Prompt to close
+				// Close tip
 				const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 				const closeStr = isTouch ? "Tap anywhere or Press E to Close" : "Click or Press E to Close";
 				const closePrompt = this.add

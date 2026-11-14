@@ -12,17 +12,35 @@ export function openModal(scene, options = {}) {
 		closeOnEOrEscKey = true,
 		buildContent,
 		onKeyDown,
+		onCloseStart,
 		onClose,
 	} = options;
 
-	if (scene.interactText) {
+	const prevBannerVisible = scene?.bannerText ? scene.bannerText.visible : false;
+
+	if (scene?.interactText) {
 		scene.interactText.setVisible(false);
+	}
+	if (scene?.bannerText) {
+		scene.bannerText.setVisible(false);
+	}
+	if (scene?.coordText) {
+		scene.coordText.setVisible(false);
 	}
 
 	// Depth-200 container
 	const container = scene.add.container(0, 0).setDepth(200);
 
 	let isClosing = false;
+
+	const restoreSceneHud = () => {
+		if (scene?.bannerText && scene.bannerText.active) {
+			scene.bannerText.setVisible(prevBannerVisible);
+		}
+		if (scene?.coordText && scene.coordText.active && scene.showHelpOverlays) {
+			scene.coordText.setVisible(true);
+		}
+	};
 
 	const removeListeners = () => {
 		window.removeEventListener("keydown", keyListener);
@@ -36,6 +54,17 @@ export function openModal(scene, options = {}) {
 		if (isClosing) return;
 		isClosing = true;
 		removeListeners();
+		restoreSceneHud();
+		if (scene) {
+			if (scene.interactKey && typeof scene.interactKey.reset === "function") {
+				scene.interactKey.reset();
+			}
+			scene.tapInteractRequested = false;
+			if (scene.touchControls) {
+				scene.touchControls.consumeInteract();
+			}
+		}
+		if (onCloseStart) onCloseStart();
 
 		scene.tweens.add({
 			targets: container,
@@ -57,6 +86,7 @@ export function openModal(scene, options = {}) {
 		if (isClosing) return;
 		isClosing = true;
 		removeListeners();
+		restoreSceneHud();
 
 		if (container && container.active) {
 			container.destroy();
@@ -98,6 +128,7 @@ export function openModal(scene, options = {}) {
 
 	// Keydown listener
 	const keyListener = (event) => {
+		if (event.repeat) return;
 		if (closeOnEOrEscKey && (event.key === "e" || event.key === "E" || event.key === "Escape")) {
 			closeModal();
 			return;

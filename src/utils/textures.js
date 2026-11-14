@@ -19,7 +19,7 @@ export function createTransparentTexture(scene, key, sourceKey, tolerance = 40) 
 	const canvas = document.createElement("canvas");
 	canvas.width = sourceTexture.width;
 	canvas.height = sourceTexture.height;
-	const ctx = canvas.getContext("2d");
+	const ctx = canvas.getContext("2d", { willReadFrequently: true });
 	ctx.drawImage(sourceTexture, 0, 0);
 
 	const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -72,5 +72,104 @@ export function createTransparentTexture(scene, key, sourceKey, tolerance = 40) 
 	}
 	ctx.putImageData(imgData, 0, 0);
 
+	scene.textures.addCanvas(key, canvas);
+}
+
+/**
+ * Flood-fills only the exterior backdrop connected to the image edges,
+ * replacing it with transparency so isometric rooms blend into the UI theme
+ * without affecting interior colors.
+ */
+export function keyExteriorBackdrop(scene, key, sourceKey, tolerance = 32) {
+	if (scene.textures.exists(key)) return;
+
+	if (!scene.textures.exists(sourceKey)) {
+		console.warn(`Texture key ${sourceKey} does not exist.`);
+		return;
+	}
+
+	const sourceTexture = scene.textures.get(sourceKey).getSourceImage();
+	if (!sourceTexture || !sourceTexture.width || !sourceTexture.height) {
+		console.error("Failed to find a valid source image for key:", sourceKey);
+		return;
+	}
+
+	const canvas = document.createElement("canvas");
+	canvas.width = sourceTexture.width;
+	canvas.height = sourceTexture.height;
+	const ctx = canvas.getContext("2d", { willReadFrequently: true });
+	ctx.drawImage(sourceTexture, 0, 0);
+
+	const w = canvas.width;
+	const h = canvas.height;
+	const imgData = ctx.getImageData(0, 0, w, h);
+	const data = imgData.data;
+
+	const bgR = data[0];
+	const bgG = data[1];
+	const bgB = data[2];
+	const tolSq = tolerance * tolerance;
+
+	const visited = new Uint8Array(w * h);
+	const queue = new Int32Array(w * h);
+	let head = 0;
+	let tail = 0;
+
+	const trySeed = (x, y) => {
+		const idx = y * w + x;
+		if (visited[idx]) return;
+		const p = idx * 4;
+		const dr = data[p] - bgR;
+		const dg = data[p + 1] - bgG;
+		const db = data[p + 2] - bgB;
+		if (dr * dr + dg * dg + db * db <= tolSq) {
+			visited[idx] = 1;
+			queue[tail++] = idx;
+		}
+	};
+
+	for (let x = 0; x < w; x++) {
+		trySeed(x, 0);
+		trySeed(x, h - 1);
+	}
+	for (let y = 1; y < h - 1; y++) {
+		trySeed(0, y);
+		trySeed(w - 1, y);
+	}
+
+	while (head < tail) {
+		const idx = queue[head++];
+		const p = idx * 4;
+		data[p + 3] = 0;
+
+		const x = idx % w;
+		const y = (idx - x) / w;
+
+		if (x > 0) trySeed(x - 1, y);
+		if (x + 1 < w) trySeed(x + 1, y);
+		if (y > 0) trySeed(x, y - 1);
+		if (y + 1 < h) trySeed(x, y + 1);
+	}
+
+	// Feather 1px fringe pixels directly adjacent to keyed exterior
+	const fringeTolSq = (tolerance + 24) * (tolerance + 24);
+	for (let y = 1; y < h - 1; y++) {
+		for (let x = 1; x < w - 1; x++) {
+			const idx = y * w + x;
+			if (visited[idx]) continue;
+			const hasClearedNeighbor =
+				visited[idx - 1] || visited[idx + 1] || visited[idx - w] || visited[idx + w];
+			if (!hasClearedNeighbor) continue;
+			const p = idx * 4;
+			const dr = data[p] - bgR;
+			const dg = data[p + 1] - bgG;
+			const db = data[p + 2] - bgB;
+			if (dr * dr + dg * dg + db * db <= fringeTolSq) {
+				data[p + 3] = Math.min(data[p + 3], 60);
+			}
+		}
+	}
+
+	ctx.putImageData(imgData, 0, 0);
 	scene.textures.addCanvas(key, canvas);
 }

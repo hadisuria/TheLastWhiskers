@@ -8,6 +8,7 @@ const config = {
 	type: Phaser.AUTO,
 	width: 800,
 	height: 600,
+	backgroundColor: "#16100c",
 	scale: {
 		mode: Phaser.Scale.FIT,
 		autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -24,3 +25,9 @@ const config = {
 
 // Game instance
 const game = new Phaser.Game(config);
+
+if (import.meta.env.DEV) {
+	window.game = game;
+	window.__debug = window.__debug || {};
+	window.__debug.game = game;
+}

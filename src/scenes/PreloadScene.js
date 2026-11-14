@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { preloadAudio } from '../AudioManager.js';
-import { createTransparentTexture } from '../utils/textures.js';
+import { createTransparentTexture, keyExteriorBackdrop } from '../utils/textures.js';
 
 /**
  * PreloadScene — Phase 4D Loading Screen
@@ -28,8 +28,8 @@ export default class PreloadScene extends Phaser.Scene {
 		this.load.on('complete', () => this._onLoadComplete());
 
 		// ---- Room backgrounds -----------------------------------------------
-		this.load.image('japanese-room', '../assets/room/room.jpeg');
-		this.load.image('gallery-room',  '../assets/room/gallery.png');
+		this.load.image('japanese-room-raw', '../assets/room/room.jpeg');
+		this.load.image('gallery-room',      '../assets/room/gallery.png');
 
 		// ---- Character ------------------------------------------------------
 		this.load.image('cat-raw', '../assets/character/cat.png');
@@ -221,6 +221,7 @@ export default class PreloadScene extends Phaser.Scene {
 		}
 
 		createTransparentTexture(this, 'cat', 'cat-raw');
+		keyExteriorBackdrop(this, 'japanese-room', 'japanese-room-raw');
 
 		// Brief pause, then fade to black and start the room
 		this.time.delayedCall(600, () => {
